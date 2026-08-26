@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'" />
+  <title>MyCursor 换号助手</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">✦</span>
+      <div>
+        <div class="brand-title">MyCursor 换号助手</div>
+        <div class="brand-sub">粘 token 加号 · 一键换号登录 Cursor</div>
+      </div>
+    </div>
+    <div id="status" class="status"></div>
+  </header>
+
+  <main>
+    <!-- 加号 -->
+    <section class="card">
+      <div class="card-head">
+        <div class="card-title">➕ 添加账号（token 登录）</div>
+      </div>
+      <p class="hint">把卖家给你的 <b>Cursor 会话 token</b> 粘到这里（<code>user_xxx::eyJ…</code> 这种，或整段 <code>WorkosCursorSessionToken=…</code> cookie 也行）。添加时会校验一次是否有效。</p>
+      <textarea id="tokenInput" rows="4" placeholder="在此粘贴 token…"></textarea>
+      <div class="row">
+        <button id="addBtn" class="btn btn-primary">校验并添加</button>
+        <span id="addMsg" class="msg"></span>
+      </div>
+    </section>
+
+    <!-- 账号列表 -->
+    <section class="card">
+      <div class="card-head">
+        <div class="card-title">🔀 我的账号 <span id="count" class="count"></span></div>
+        <button id="refreshBtn" class="btn btn-ghost">🔄 刷新</button>
+      </div>
+      <p class="hint">点「换到它」= 用该账号登录本机 Cursor：先做登录握手 → 关掉 Cursor → 写入登录信息 → 自动重启 Cursor。<b>换号会关闭正在运行的 Cursor</b>，请先存好文件。</p>
+      <div id="list" class="list"></div>
+      <div id="empty" class="empty">还没有账号，先在上面粘 token 添加。</div>
+    </section>
+
+    <!-- 日志 -->
+    <section class="card">
+      <div class="card-head"><div class="card-title">📜 日志</div><button id="clearLog" class="btn btn-ghost">清空</button></div>
+      <div id="log" class="log"></div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

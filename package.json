@@ -1,0 +1,46 @@
+{
+  "name": "mycursor-switch",
+  "version": "1.0.0",
+  "description": "MyCursor 换号助手 — 粘 token 加号 + 一键换号登录 Cursor（Windows / macOS）",
+  "main": "src/main.js",
+  "author": "MyCursor",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --publish never",
+    "dist": "electron-builder --publish always"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.8.1"
+  },
+  "devDependencies": {
+    "electron": "^31.7.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "space.4399.mycursor.switch",
+    "productName": "MyCursorSwitch",
+    "artifactName": "${productName}-${os}.${ext}",
+    "files": [
+      "src/**/*",
+      "!**/*.map"
+    ],
+    "publish": [
+      { "provider": "github" }
+    ],
+    "win": {
+      "target": ["nsis"]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "mac": {
+      "target": [
+        { "target": "dmg", "arch": "universal" }
+      ],
+      "category": "public.app-category.developer-tools"
+    }
+  }
+}
