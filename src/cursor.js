@@ -14,6 +14,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { execFile, spawn } = require('child_process');
+const { shell } = require('electron');   // 用 shell.openPath 启动 Cursor，避免弹出黑色 cmd 窗口
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36';
 
@@ -205,8 +206,20 @@ function isDbLocked() {
 
 function run(cmd, args) {
   return new Promise((resolve) => {
-    try { execFile(cmd, args, { timeout: 8000 }, () => resolve()); }
+    try { execFile(cmd, args, { timeout: 8000, windowsHide: true }, () => resolve()); }
     catch { resolve(); }
+  });
+}
+
+// Windows：查正在运行的 Cursor.exe 完整路径（换号后按原路径重启，避免装在非标准位置找不到而弹黑框）
+function winCursorPath() {
+  return new Promise((resolve) => {
+    try {
+      execFile('powershell',
+        ['-NoProfile', '-Command', '(Get-Process Cursor -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Path)'],
+        { timeout: 6000, windowsHide: true },
+        (err, stdout) => { const p = (stdout || '').trim(); resolve(p && fs.existsSync(p) ? p : null); });
+    } catch { resolve(null); }
   });
 }
 
@@ -235,13 +248,16 @@ function findCursorExeWin() {
   return null;
 }
 
-async function launchCursor() {
+async function launchCursor(preferWinExe) {
   try {
     if (process.platform === 'win32') {
-      const exe = findCursorExeWin();
-      if (exe) { spawn(exe, [], { detached: true, stdio: 'ignore' }).unref(); return true; }
-      spawn('cmd', ['/c', 'start', '', 'cursor'], { detached: true, stdio: 'ignore', shell: false }).unref();
-      return true;
+      const exe = preferWinExe || findCursorExeWin();
+      if (exe) {
+        try { await shell.openPath(exe); }   // 用系统关联打开 exe，不弹 cmd 黑框
+        catch { spawn(exe, [], { detached: true, stdio: 'ignore', windowsHide: true }).unref(); }
+        return true;
+      }
+      return false;   // 找不到 Cursor 就不强开（绝不再 cmd/start 弹黑框），用户手动打开即可
     }
     if (process.platform === 'darwin') { await run('open', ['-a', 'Cursor']); return true; }
     spawn('cursor', [], { detached: true, stdio: 'ignore' }).unref();
@@ -270,13 +286,15 @@ async function switchAccount(fullToken, email, log) {
     userId = sub ? 'auth0|' + sub : '';
   }
 
-  // 2) 关 Cursor → 等库解锁 → 写库
+  // 2) 关 Cursor → 等库解锁 → 写库（先记住正在运行的 Cursor 路径，换完按原路径重启）
+  let winExe = null;
+  if (process.platform === 'win32') { try { winExe = await winCursorPath(); } catch { /* ignore */ } }
   await killCursor();
   for (let i = 0; i < 6 && isDbLocked(); i++) await sleep(300);
   writeKeys(access, refresh, userId, email || '');
 
   // 3) 重启
-  await launchCursor();
+  await launchCursor(winExe);
   return {
     ok: true,
     handshakeOk,
