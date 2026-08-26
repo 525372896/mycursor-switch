@@ -1,0 +1,48 @@
+﻿# 一键发布新版本：改 package.json 版本 → 提交 → 打 tag → 推送。
+# 推送 tag 后 GitHub Actions 会自动构建 Windows/macOS 安装包并发布到 Release（不再进草稿）。
+$ErrorActionPreference = 'Stop'
+Set-Location -Path $PSScriptRoot
+
+try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch {}
+
+$path = Join-Path $PSScriptRoot 'package.json'
+$raw = [IO.File]::ReadAllText($path)
+$m = [regex]::Match($raw, '"version"\s*:\s*"([^"]+)"')
+$cur = if ($m.Success) { $m.Groups[1].Value } else { '0.0.0' }
+Write-Host ""
+Write-Host "  当前版本：v$cur" -ForegroundColor Cyan
+
+$parts = $cur.Split('.')
+$suggest = "$($parts[0]).$($parts[1]).$([int]$parts[2] + 1)"
+$inp = Read-Host "  输入要发布的新版本号（直接回车用 $suggest）"
+$ver = if ([string]::IsNullOrWhiteSpace($inp)) { $suggest } else { $inp.Trim().TrimStart('v') }
+if ($ver -notmatch '^\d+\.\d+\.\d+$') { Write-Host "  ✗ 版本号格式不对，应为 X.Y.Z（如 1.0.1）" -ForegroundColor Red; Read-Host "  按回车退出"; exit 1 }
+
+$tag = "v$ver"
+if (git tag --list $tag) { Write-Host "  ✗ tag $tag 已存在，换个版本号。" -ForegroundColor Red; Read-Host "  按回车退出"; exit 1 }
+
+# 写回 package.json 的 version（UTF-8 无 BOM，避免影响 Node/electron-builder 读取）
+$raw2 = [regex]::Replace($raw, '("version"\s*:\s*")[^"]*(")', "`${1}$ver`${2}", 1)
+[IO.File]::WriteAllText($path, $raw2, (New-Object Text.UTF8Encoding($false)))
+Write-Host "  已把版本改为 v$ver" -ForegroundColor Green
+
+git add -A | Out-Null
+$name = (git config user.name 2>$null); $email = (git config user.email 2>$null)
+if (-not $name -or -not $email) {
+  git -c user.name="mycursor" -c user.email="mycursor@users.noreply.github.com" commit -m "release $tag" | Out-Null
+} else {
+  git commit -m "release $tag" | Out-Null
+}
+git tag $tag | Out-Null
+
+Write-Host "  推送中…（若弹出 GitHub 登录，用 525372896 账号授权一次即可，之后不再问）" -ForegroundColor Cyan
+$env:GIT_TERMINAL_PROMPT = 0
+git push origin main
+git push origin $tag
+
+Write-Host ""
+Write-Host "  ✅ 已推送 $tag，GitHub Actions 正在出包，约 5-10 分钟后自动发布到 Release。" -ForegroundColor Green
+Write-Host "     构建进度： https://github.com/525372896/mycursor-switch/actions"
+Write-Host "     查码小站下载按钮/直链无需改动，始终指向最新版。"
+Write-Host ""
+Read-Host "  按回车退出"
