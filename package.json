@@ -26,7 +26,7 @@
       "!**/*.map"
     ],
     "publish": [
-      { "provider": "github" }
+      { "provider": "github", "releaseType": "release" }
     ],
     "win": {
       "target": ["nsis"]
