@@ -16,6 +16,7 @@ function createWindow() {
     minHeight: 520,
     title: 'MyCursor 换号助手',
     backgroundColor: '#0f1729',
+    icon: path.join(__dirname, 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,

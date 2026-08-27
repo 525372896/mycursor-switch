@@ -1,6 +1,6 @@
 {
   "name": "mycursor-switch",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "MyCursor 换号助手 — 粘 token 加号 + 一键换号登录 Cursor（Windows / macOS）",
   "main": "src/main.js",
   "author": "MyCursor",
@@ -30,18 +30,22 @@
       { "provider": "github", "owner": "525372896", "repo": "mycursor-switch", "releaseType": "release" }
     ],
     "win": {
-      "target": ["nsis"]
+      "target": ["nsis"],
+      "icon": "build/icon.ico"
     },
     "nsis": {
       "oneClick": false,
       "perMachine": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico"
     },
     "mac": {
       "target": [
         { "target": "dmg", "arch": "universal" }
       ],
-      "category": "public.app-category.developer-tools"
+      "category": "public.app-category.developer-tools",
+      "icon": "build/icon.png"
     }
   }
 }
