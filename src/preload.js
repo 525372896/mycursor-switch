@@ -8,5 +8,6 @@ contextBridge.exposeInMainWorld('api', {
   add: (token) => ipcRenderer.invoke('accounts:add', token),
   remove: (id) => ipcRenderer.invoke('accounts:remove', id),
   switch: (id) => ipcRenderer.invoke('accounts:switch', id),
+  checkUpdate: () => ipcRenderer.invoke('app:checkUpdate'),
   onLog: (cb) => ipcRenderer.on('log', (_e, line) => cb(line)),
 });

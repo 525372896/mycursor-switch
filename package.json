@@ -1,6 +1,6 @@
 {
   "name": "mycursor-switch",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "MyCursor 换号助手 — 粘 token 加号 + 一键换号登录 Cursor（Windows / macOS）",
   "main": "src/main.js",
   "author": "MyCursor",
@@ -11,7 +11,8 @@
     "dist": "electron-builder --publish always"
   },
   "dependencies": {
-    "better-sqlite3": "^11.8.1"
+    "better-sqlite3": "^11.8.1",
+    "electron-updater": "^6.3.9"
   },
   "devDependencies": {
     "electron": "^31.7.0",
@@ -26,7 +27,7 @@
       "!**/*.map"
     ],
     "publish": [
-      { "provider": "github", "releaseType": "release" }
+      { "provider": "github", "owner": "525372896", "repo": "mycursor-switch", "releaseType": "release" }
     ],
     "win": {
       "target": ["nsis"]

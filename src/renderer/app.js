@@ -28,14 +28,26 @@ async function loadStatus() {
   try {
     const s = await window.api.status();
     const el = $('status');
+    const plat = s.platform === 'darwin' ? 'macOS' : s.platform === 'win32' ? 'Windows' : s.platform;
+    const ver = s.version ? ` · v${s.version}` : '';
     if (s.cursorInstalled) {
       el.className = 'status';
-      el.textContent = `✓ 已检测到 Cursor（${s.platform === 'darwin' ? 'macOS' : s.platform === 'win32' ? 'Windows' : s.platform}）`;
+      el.textContent = `✓ 已检测到 Cursor（${plat}）${ver}`;
     } else {
       el.className = 'status bad';
-      el.textContent = '⚠ 没检测到 Cursor 登录数据，请先装并登录过一次 Cursor';
+      el.textContent = `⚠ 没检测到 Cursor 登录数据，请先装并登录过一次 Cursor${ver}`;
     }
   } catch { /* ignore */ }
+}
+
+async function doCheckUpdate() {
+  const btn = $('updateBtn');
+  btn.disabled = true;
+  try {
+    const r = await window.api.checkUpdate();
+    if (r && r.ok === false) logLine('（开发模式无法检查更新，打包安装后才生效）');
+  } catch (e) { logLine('⚠ ' + e.message); }
+  setTimeout(() => { btn.disabled = false; }, 2000);
 }
 
 async function loadList(keepPage) {
@@ -134,6 +146,7 @@ $('addClose').onclick = closeAdd;
 $('addSubmit').onclick = doAdd;
 $('addModal').onclick = (e) => { if (e.target.id === 'addModal') closeAdd(); };
 $('refreshBtn').onclick = () => loadList(true);
+$('updateBtn').onclick = doCheckUpdate;
 $('clearLog').onclick = () => { $('log').innerHTML = ''; };
 window.api.onLog(logLine);
 
