@@ -6,13 +6,30 @@ Set-Location -Path $PSScriptRoot
 
 try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch {}
 
+# 读 Windows 系统代理（Clash/Verge 开「系统代理」后会写到这里）。
+# git 默认不走系统代理，而国内直连 github 常被墙（443 超时/连接重置），所以推送时要显式带上代理。
+function Get-SystemProxy {
+  try {
+    $s = Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings' -ErrorAction Stop
+    if ($s.ProxyEnable -eq 1 -and $s.ProxyServer) {
+      if ($s.ProxyServer -match '(?:https?=)?(\d{1,3}(?:\.\d{1,3}){3}:\d+)') { return 'http://' + $Matches[1] }
+      if ($s.ProxyServer -match '(?:https?=)?([^;]+:\d+)') { return 'http://' + $Matches[1] }
+    }
+  } catch { }
+  return $null
+}
+
 function Push-WithRetry([string]$refspec) {
   $env:GIT_TERMINAL_PROMPT = 0
+  $proxy = Get-SystemProxy
+  $pa = @()
+  if ($proxy) { $pa = @('-c', "http.proxy=$proxy", '-c', "https.proxy=$proxy") }
   for ($i = 1; $i -le 6; $i++) {
-    Write-Host "  推送 $refspec …（第 $i/6 次）" -ForegroundColor Cyan
-    git push origin $refspec
+    $via = if ($proxy) { "，走代理 $proxy" } else { "，直连（没开系统代理）" }
+    Write-Host "  推送 $refspec …（第 $i/6 次$via）" -ForegroundColor Cyan
+    git @pa push origin $refspec
     if ($LASTEXITCODE -eq 0) { return $true }
-    if ($i -lt 6) { Write-Host "  连接失败，5 秒后重试…（GitHub 偶发 443 超时/代理抖动）" -ForegroundColor Yellow; Start-Sleep -Seconds 5 }
+    if ($i -lt 6) { Write-Host "  失败，5 秒后重试…（github 直连常被墙；若一直失败请确认 Clash 已开『系统代理』）" -ForegroundColor Yellow; Start-Sleep -Seconds 5 }
   }
   return $false
 }
