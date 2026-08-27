@@ -92,3 +92,9 @@ textarea:focus { outline: none; border-color: var(--brand); }
   height: 150px; overflow: auto; font-family: ui-monospace, Consolas, monospace; font-size: 12px; line-height: 1.7; color: #b9c6e6;
 }
 .log .l-ok { color: #6ee7b7; } .log .l-warn { color: #fcd34d; } .log .l-err { color: #fca5a5; }
+/* 下载进度条：日志区里就地刷新的一行 */
+.log .l-prog { display: flex; align-items: center; gap: 8px; margin: 3px 0; }
+.log .l-prog .pl { color: #7cc0ff; white-space: nowrap; }
+.log .l-prog .pbar { flex: 1; height: 8px; background: #1b2748; border: 1px solid #26324f; border-radius: 6px; overflow: hidden; }
+.log .l-prog .pbar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #2563eb, #7c3aed); transition: width .2s ease; }
+.log .l-prog .pp { color: #6ee7b7; min-width: 40px; text-align: right; }

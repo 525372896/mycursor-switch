@@ -46,7 +46,7 @@ function initUpdater() {
 
     autoUpdater.on('checking-for-update', () => log('🔎 正在检查更新…'));
     autoUpdater.on('update-not-available', () => log('✅ 已是最新版本'));
-    autoUpdater.on('download-progress', (p) => log(`⬇ 下载更新 ${Math.round(p.percent)}%`));
+    autoUpdater.on('download-progress', (p) => { if (win) win.webContents.send('update-progress', Math.round(p.percent)); });
     autoUpdater.on('error', (e) => log('⚠ 检查更新失败：' + ((e && e.message) || e)));
 
     autoUpdater.on('update-available', (info) => {
@@ -63,6 +63,7 @@ function initUpdater() {
     });
 
     autoUpdater.on('update-downloaded', (info) => {
+      if (win) win.webContents.send('update-progress', 100);
       log(`✅ 新版本 v${info.version} 已下载完成`);
       dialog.showMessageBox(win, {
         type: 'info', buttons: ['立即重启安装', '稍后'], defaultId: 0, cancelId: 1,

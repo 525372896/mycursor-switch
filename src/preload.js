@@ -9,5 +9,6 @@ contextBridge.exposeInMainWorld('api', {
   remove: (id) => ipcRenderer.invoke('accounts:remove', id),
   switch: (id) => ipcRenderer.invoke('accounts:switch', id),
   checkUpdate: () => ipcRenderer.invoke('app:checkUpdate'),
+  onProgress: (cb) => ipcRenderer.on('update-progress', (_e, pct) => cb(pct)),
   onLog: (cb) => ipcRenderer.on('log', (_e, line) => cb(line)),
 });

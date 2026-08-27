@@ -19,6 +19,23 @@ function logLine(line) {
   box.scrollTop = box.scrollHeight;
 }
 
+// 下载进度：在日志区维护"一行"进度条，就地刷新百分比与进度条宽度（不再每 1% 刷一行）
+var progressEl = null;
+function showProgress(pct) {
+  const box = $('log');
+  if (!progressEl || !progressEl.isConnected) {
+    progressEl = document.createElement('div');
+    progressEl.className = 'l-prog';
+    progressEl.innerHTML = '<span class="pl">⬇ 下载更新</span><span class="pbar"><i></i></span><span class="pp">0%</span>';
+    box.appendChild(progressEl);
+  }
+  const p = Math.max(0, Math.min(100, Math.round(pct || 0)));
+  progressEl.querySelector('i').style.width = p + '%';
+  progressEl.querySelector('.pp').textContent = p + '%';
+  box.scrollTop = box.scrollHeight;
+}
+function resetProgress() { progressEl = null; }
+
 function setMsg(el, text, kind) {
   el.textContent = text || '';
   el.className = 'msg' + (kind ? ' ' + kind : '');
@@ -42,6 +59,7 @@ async function loadStatus() {
 
 async function doCheckUpdate() {
   const btn = $('updateBtn');
+  resetProgress();
   btn.disabled = true;
   try {
     const r = await window.api.checkUpdate();
@@ -148,6 +166,7 @@ $('addModal').onclick = (e) => { if (e.target.id === 'addModal') closeAdd(); };
 $('refreshBtn').onclick = () => loadList(true);
 $('updateBtn').onclick = doCheckUpdate;
 $('clearLog').onclick = () => { $('log').innerHTML = ''; };
+window.api.onProgress(showProgress);
 window.api.onLog(logLine);
 
 loadStatus();
