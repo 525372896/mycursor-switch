@@ -66,8 +66,10 @@ textarea:focus { outline: none; border-color: var(--brand); }
 .pager button:disabled { opacity: .4; cursor: not-allowed; }
 .logcard { margin-top: 4px; }
 /* 弹窗 */
-.modal-hide { display: none; }
 #addModal { position: fixed; inset: 0; background: rgba(5,10,20,.6); display: grid; place-items: center; z-index: 50; padding: 20px; }
+/* ID+class 组合优先级(1,1,0) 必须压过上面的 #addModal(1,0,0)，否则 .modal-hide 的 display:none 被 display:grid 盖掉，弹窗关不掉 */
+#addModal.modal-hide { display: none; }
+.modal-hide { display: none; }
 #addModal .sheet { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; width: 100%; max-width: 520px; overflow: hidden; }
 #addModal .shead { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--line); font-weight: 700; }
 #addModal .x { border: none; background: transparent; color: var(--muted); font-size: 22px; cursor: pointer; line-height: 1; }

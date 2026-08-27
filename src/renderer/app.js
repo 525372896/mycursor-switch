@@ -103,6 +103,7 @@ async function doAdd() {
     const r = await window.api.add(token);
     if (r.ok) {
       logLine('➕ ' + r.msg);
+      setMsg($('addMsg'), '');   // 清掉「校验中…」，避免关闭异常时残留
       closeAdd();
       await loadList();   // 回到第 1 页看到新号
     } else {
