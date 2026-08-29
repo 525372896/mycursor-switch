@@ -1,6 +1,6 @@
 {
   "name": "mycursor-switch",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "MyCursor 换号助手 — 粘 token 加号 + 一键换号登录 Cursor（Windows / macOS）",
   "main": "src/main.js",
   "author": "MyCursor",
