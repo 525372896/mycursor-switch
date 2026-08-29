@@ -95,10 +95,12 @@ function renderList() {
       <span class="idx">${idx}</span>
       <span class="email"></span>
       <span class="meta">…${a.tokenTail || ''}</span>
+      <button class="btn btn-info btn-sm act-usage" title="打开该账号的只读额度页（只看用量/额度，不进 Cursor 后台）">额度</button>
       <button class="btn btn-ok btn-sm act-switch">换到它</button>
       <button class="btn btn-del btn-sm act-del">删除</button>`;
     row.querySelector('.email').textContent = a.email || '(未知邮箱)';
     row.querySelector('.meta').title = added ? '添加于 ' + added : '';
+    row.querySelector('.act-usage').onclick = () => doUsage(a, row);
     row.querySelector('.act-switch').onclick = () => doSwitch(a, row);
     row.querySelector('.act-del').onclick = () => doRemove(a);
     box.appendChild(row);
@@ -151,6 +153,17 @@ async function doSwitch(a, row) {
     if (!r.ok) logLine('❌ ' + (r.msg || '换号失败'));
   } catch (e) { logLine('❌ ' + e.message); }
   btn.disabled = false; btn.textContent = '换到它';
+}
+
+async function doUsage(a, row) {
+  const btn = row.querySelector('.act-usage');
+  const old = btn.textContent;
+  btn.disabled = true; btn.textContent = '读取中…';
+  try {
+    const r = await window.api.openUsage(a.id);
+    if (r && r.ok === false) logLine('⚠ ' + (r.msg || '读取额度失败'));
+  } catch (e) { logLine('❌ ' + e.message); }
+  btn.disabled = false; btn.textContent = old;
 }
 
 async function doRemove(a) {

@@ -87,6 +87,76 @@ async function validateToken(rawToken) {
   }
 }
 
+// ---------- 读取额度（自助「只读额度页」用）：调 dashboard 用量接口，返回结构化数据 ----------
+
+function num(x) { return typeof x === 'number' ? x : (x != null && x !== '' && !isNaN(+x) ? +x : null); }
+
+async function fetchUsage(rawToken) {
+  const token = normalizeToken(rawToken);
+  if (!token) return { ok: false, msg: 'token 为空' };
+  const H = { 'User-Agent': UA, 'Accept': '*/*', 'Cookie': cookieHeader(token) };
+  const HJ = { ...H, 'Content-Type': 'application/json', 'Origin': 'https://cursor.com', 'Referer': 'https://cursor.com/dashboard' };
+  const out = { ok: true, email: '', membership: '', resetAt: '', usage: null, onDemand: null, grok: null };
+  // 先用 /api/auth/me 校验登录态（顺便拿邮箱）；失效直接返回，让界面提示
+  try {
+    const me = await fetch('https://cursor.com/api/auth/me', { headers: H, redirect: 'follow' });
+    const finalUrl = me.url || '';
+    if (me.status === 401 || me.status === 403 || /workos|\/authorize|\/login/i.test(finalUrl)) {
+      return { ok: false, msg: 'token 已失效（被要求重新登录）' };
+    }
+    if (me.ok) { const d = await me.json().catch(() => ({})); out.email = d.email || (d.user && d.user.email) || d.userEmail || ''; }
+  } catch (e) {
+    return { ok: false, msg: '连不上 cursor.com：' + e.message + '（需要能访问外网/科学上网）' };
+  }
+  // 本期用量（总用量% + Auto/API + 金额）
+  try {
+    const r = await fetch('https://cursor.com/api/dashboard/get-current-period-usage', { method: 'POST', headers: HJ, body: '{}' });
+    const d = await r.json().catch(() => ({}));
+    const pu = d && d.planUsage;
+    if (pu) out.usage = {
+      total: num(pu.totalPercentUsed), auto: num(pu.autoPercentUsed), api: num(pu.apiPercentUsed),
+      totalSpend: num(pu.totalSpend), includedSpend: num(pu.includedSpend), limit: num(pu.limit), remaining: num(pu.remaining),
+    };
+  } catch { /* 单项失败不影响其它 */ }
+  // 套餐类型 + 额度重置日 + On-Demand
+  try {
+    const r = await fetch('https://cursor.com/api/usage-summary', { headers: H });
+    const d = await r.json().catch(() => ({}));
+    out.membership = d.membershipType || '';
+    out.resetAt = d.billingCycleEnd || '';
+    const iu = d.individualUsage || {};
+    if (iu.onDemand) out.onDemand = { used: num(iu.onDemand.used), limit: num(iu.onDemand.limit), enabled: iu.onDemand.enabled !== false };
+  } catch { /* 忽略 */ }
+  // Grok Bot 额度（有这块才返回；含试用/周期两种）
+  try {
+    const r = await fetch('https://cursor.com/api/dashboard/get-sand-usage-status', { method: 'POST', headers: HJ, body: '{}' });
+    const d = await r.json().catch(() => ({}));
+    const has = ('usagePercent' in d) || ('hasAvailableUsage' in d) || (typeof d.sandTrialExpiresAt === 'string') || (d.includedLimitZero === false) || (d.hasNonZeroIncludedLimit === true);
+    if (has) out.grok = {
+      usagePercent: num(d.usagePercent), hasAvailable: d.hasAvailableUsage !== false,
+      trial: typeof d.sandTrialExpiresAt === 'string', resetAt: d.sandTrialExpiresAt || d.nextResetTimestampUtc || '',
+      label: d.grokPlanLabel || 'Grok Bot',
+    };
+  } catch { /* 忽略 */ }
+  // 用量明细（官网 dashboard/usage：近 30 天最多 50 条，按模型/时间的 token 与费用）
+  try {
+    const end = Date.now(), start = end - 30 * 86400000;
+    const body = JSON.stringify({ teamId: 0, startDate: String(start), endDate: String(end), page: 1, pageSize: 50 });
+    const r = await fetch('https://cursor.com/api/dashboard/get-filtered-usage-events', { method: 'POST', headers: HJ, body });
+    const d = await r.json().catch(() => ({}));
+    const arr = Array.isArray(d.usageEventsDisplay) ? d.usageEventsDisplay : [];
+    out.events = arr.map((ev) => {
+      const tu = ev.tokenUsage || {};
+      const tokens = (num(tu.inputTokens) || 0) + (num(tu.outputTokens) || 0) + (num(tu.cacheReadTokens) || 0);
+      const ubc = String(ev.usageBasedCosts || '').replace('$', '').trim();
+      const costCents = (ubc && ubc !== '-' && !isNaN(+ubc)) ? +ubc * 100 : 0;   // >0=走超额实扣；0=含在套餐(Included)
+      return { ts: num(ev.timestamp), model: ev.model || '', kind: ev.kind || '', tokens, costCents };
+    });
+    out.eventsTotal = num(d.totalUsageEventsCount) || out.events.length;
+  } catch { /* 忽略 */ }
+  return out;
+}
+
 // ---------- 深链握手（换号时用）：登记本机登录并取回桌面 access/refresh/authId ----------
 
 async function exchangeSession(fullToken, log) {
@@ -307,6 +377,6 @@ async function switchAccount(fullToken, email, log) {
 function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
 module.exports = {
-  normalizeToken, validateToken, exchangeSession, switchAccount,
+  normalizeToken, validateToken, fetchUsage, exchangeSession, switchAccount,
   stateDbPath, stateDbExists,
 };

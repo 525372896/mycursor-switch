@@ -54,6 +54,8 @@ textarea:focus { outline: none; border-color: var(--brand); }
 .btn-ok:hover { background: #047857; }
 .btn-del { color: #fecaca; }
 .btn-del:hover { border-color: var(--err); color: #fff; background: var(--err); }
+.btn-info { color: #dbeafe; background: #1e40af; border-color: #1e40af; }
+.btn-info:hover { background: #2563eb; border-color: #2563eb; }
 
 .msg { font-size: 12px; }
 .msg.ok { color: var(--ok); } .msg.err { color: var(--err); } .msg.warn { color: var(--warn); }
