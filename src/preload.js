@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('api', {
   switch: (id) => ipcRenderer.invoke('accounts:switch', id),
   openUsage: (id) => ipcRenderer.invoke('accounts:openUsage', id),
   checkUpdate: () => ipcRenderer.invoke('app:checkUpdate'),
+  openGithub: () => ipcRenderer.invoke('app:openGithub'),
   onProgress: (cb) => ipcRenderer.on('update-progress', (_e, pct) => cb(pct)),
   onLog: (cb) => ipcRenderer.on('log', (_e, line) => cb(line)),
 });

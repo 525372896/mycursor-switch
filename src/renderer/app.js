@@ -47,6 +47,7 @@ async function loadStatus() {
     const el = $('status');
     const plat = s.platform === 'darwin' ? 'macOS' : s.platform === 'win32' ? 'Windows' : s.platform;
     const ver = s.version ? ` · v${s.version}` : '';
+    $('aboutVer').textContent = s.version ? `v${s.version}` : '';
     if (s.cursorInstalled) {
       el.className = 'status';
       el.textContent = `✓ 已检测到 Cursor（${plat}）${ver}`;
@@ -126,6 +127,11 @@ function renderList() {
 function openAdd() { $('addModal').className = ''; $('tokenInput').value = ''; setMsg($('addMsg'), ''); setTimeout(() => $('tokenInput').focus(), 30); }
 function closeAdd() { $('addModal').className = 'modal-hide'; }
 
+// 关于弹窗
+function openAbout() { $('aboutModal').className = ''; }
+function closeAbout() { $('aboutModal').className = 'modal-hide'; }
+function openGithub() { window.api.openGithub().catch(() => { /* ignore */ }); }
+
 async function doAdd() {
   const btn = $('addSubmit');
   const token = $('tokenInput').value.trim();
@@ -178,6 +184,11 @@ $('addSubmit').onclick = doAdd;
 $('addModal').onclick = (e) => { if (e.target.id === 'addModal') closeAdd(); };
 $('refreshBtn').onclick = () => loadList(true);
 $('updateBtn').onclick = doCheckUpdate;
+$('aboutBtn').onclick = openAbout;
+$('aboutClose').onclick = closeAbout;
+$('aboutModal').onclick = (e) => { if (e.target.id === 'aboutModal') closeAbout(); };
+$('aboutGithub').onclick = openGithub;
+$('aboutStar').onclick = openGithub;
 $('clearLog').onclick = () => { $('log').innerHTML = ''; };
 window.api.onProgress(showProgress);
 window.api.onLog(logLine);

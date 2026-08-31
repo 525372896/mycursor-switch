@@ -69,15 +69,33 @@ textarea:focus { outline: none; border-color: var(--brand); }
 .pager button:disabled { opacity: .4; cursor: not-allowed; }
 /* 日志卡固定在窗口最底部，不随列表滚动、不被压缩 */
 .logcard { margin-top: 0; flex-shrink: 0; }
-/* 弹窗 */
-#addModal { position: fixed; inset: 0; background: rgba(5,10,20,.6); display: grid; place-items: center; z-index: 50; padding: 20px; }
-/* ID+class 组合优先级(1,1,0) 必须压过上面的 #addModal(1,0,0)，否则 .modal-hide 的 display:none 被 display:grid 盖掉，弹窗关不掉 */
-#addModal.modal-hide { display: none; }
+/* 弹窗（添加账号 / 关于 共用一套样式） */
+#addModal, #aboutModal { position: fixed; inset: 0; background: rgba(5,10,20,.6); display: grid; place-items: center; z-index: 50; padding: 20px; }
+/* ID+class 组合优先级(1,1,0) 必须压过上面的 ID 选择器(1,0,0)，否则 .modal-hide 的 display:none 被 display:grid 盖掉，弹窗关不掉 */
+#addModal.modal-hide, #aboutModal.modal-hide { display: none; }
 .modal-hide { display: none; }
-#addModal .sheet { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; width: 100%; max-width: 520px; overflow: hidden; }
-#addModal .shead { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--line); font-weight: 700; }
-#addModal .x { border: none; background: transparent; color: var(--muted); font-size: 22px; cursor: pointer; line-height: 1; }
-#addModal .sbody { padding: 16px; }
+#addModal .sheet, #aboutModal .sheet { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; width: 100%; max-width: 520px; overflow: hidden; }
+#addModal .shead, #aboutModal .shead { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--line); font-weight: 700; }
+#addModal .x, #aboutModal .x { border: none; background: transparent; color: var(--muted); font-size: 22px; cursor: pointer; line-height: 1; }
+#addModal .sbody, #aboutModal .sbody { padding: 16px; }
+
+/* 关于弹窗内容 */
+.about-app { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.about-logo { width: 44px; height: 44px; border-radius: 12px; font-size: 22px; }
+.about-name { font-weight: 700; font-size: 16px; }
+.about-ver { color: var(--muted); font-weight: 400; font-size: 12px; }
+.about-desc { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.about-gh {
+  display: flex; align-items: center; gap: 8px; padding: 10px 12px; margin: 12px 0;
+  background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; cursor: pointer;
+  font-family: ui-monospace, Consolas, monospace; font-size: 13px; transition: .15s;
+}
+.about-gh:hover { border-color: var(--brand); }
+.about-gh .gh-url { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.about-gh .gh-open { color: var(--muted); font-size: 12px; font-family: inherit; white-space: nowrap; }
+.about-gh:hover .gh-open { color: var(--brand); }
+.about-star { width: 100%; padding: 10px 14px; font-size: 14px; }
+.about-tip { margin: 10px 0 0; }
 
 .list { display: flex; flex-direction: column; gap: 8px; }
 .item {

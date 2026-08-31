@@ -24,6 +24,7 @@
       <button id="addBtn" class="btn btn-primary">➕ 添加账号</button>
       <button id="refreshBtn" class="btn btn-ghost">🔄 刷新</button>
       <button id="updateBtn" class="btn btn-ghost">⬆ 检查更新</button>
+      <button id="aboutBtn" class="btn btn-ghost">ℹ 关于</button>
       <span id="count" class="count"></span>
     </div>
 
@@ -52,6 +53,30 @@
           <button id="addSubmit" class="btn btn-primary">校验并添加</button>
           <span id="addMsg" class="msg"></span>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 关于弹窗 -->
+  <div id="aboutModal" class="modal-hide">
+    <div class="sheet">
+      <div class="shead"><span>ℹ 关于</span><button class="x" id="aboutClose">×</button></div>
+      <div class="sbody">
+        <div class="about-app">
+          <span class="logo about-logo">✦</span>
+          <div>
+            <div class="about-name">MyCursor 换号助手 <span id="aboutVer" class="about-ver"></span></div>
+            <div class="about-desc">粘 token 加号 · 一键换号登录 Cursor（Windows / macOS）</div>
+          </div>
+        </div>
+        <p class="hint">开源免费。账号只保存在你自己的电脑上（accounts.json），不上传任何服务器；token 只发给 Cursor 官方接口完成登录，源码可在 GitHub 自行审查。</p>
+        <div class="about-gh" id="aboutGithub" title="点击在浏览器打开项目主页">
+          <span>🔗</span>
+          <span class="gh-url">github.com/525372896/mycursor-switch</span>
+          <span class="gh-open">打开 ↗</span>
+        </div>
+        <button id="aboutStar" class="btn btn-primary about-star">⭐ 去 GitHub 点个 Star 支持一下</button>
+        <p class="hint about-tip">觉得好用就到项目主页右上角点个 ⭐ Star——不花一分钱，却是对作者最大的支持，也能让更多人找到这个工具。</p>
       </div>
     </div>
   </div>

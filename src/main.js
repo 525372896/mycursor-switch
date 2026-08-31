@@ -6,7 +6,8 @@ const cursor = require('./cursor');
 const store = require('./store');
 
 let win = null;
-const RELEASES_URL = 'https://github.com/525372896/mycursor-switch/releases/latest';
+const GITHUB_URL = 'https://github.com/525372896/mycursor-switch';
+const RELEASES_URL = GITHUB_URL + '/releases/latest';
 
 function createWindow() {
   win = new BrowserWindow({
@@ -99,6 +100,12 @@ ipcMain.handle('app:status', () => ({
   stateDbPath: cursor.stateDbPath(),
   version: app.getVersion(),
 }));
+
+// 关于页：在系统浏览器打开项目 GitHub 主页（只开固定地址，不接受任意 URL）
+ipcMain.handle('app:openGithub', () => {
+  shell.openExternal(GITHUB_URL).catch(() => { /* ignore */ });
+  return { ok: true, url: GITHUB_URL };
+});
 
 ipcMain.handle('app:checkUpdate', () => {
   if (!app.isPackaged) { log('（开发模式无法检查更新，打包后才生效）'); return { ok: false }; }
