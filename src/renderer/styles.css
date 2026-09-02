@@ -21,7 +21,8 @@ body {
 }
 .brand-title { font-weight: 700; font-size: 15px; }
 .brand-sub { color: var(--muted); font-size: 11px; margin-top: 1px; }
-.status { color: var(--muted); font-size: 12px; text-align: right; max-width: 46%; }
+.topbar-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.status { color: var(--muted); font-size: 12px; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; max-width: 320px; }
 .status.bad { color: var(--warn); }
 
 main { padding: 14px 18px; overflow: hidden; display: flex; flex-direction: column; gap: 14px; flex: 1; min-height: 0; }
@@ -102,9 +103,28 @@ textarea:focus { outline: none; border-color: var(--brand); }
   display: flex; align-items: center; gap: 10px; padding: 10px 12px;
   background: var(--panel2); border: 1px solid var(--line); border-radius: 10px;
 }
-.item .idx { color: var(--muted); width: 22px; text-align: right; font-size: 12px; }
-.item .email { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.item .idx { color: var(--muted); width: 22px; text-align: right; font-size: 12px; align-self: flex-start; padding-top: 2px; }
+.item .email { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
 .item .meta { color: var(--muted); font-size: 11px; font-family: ui-monospace, monospace; }
+
+/* 账号行：套餐标签 + 简易额度条 */
+.item-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.item-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.item-top .email { flex: 0 1 auto; max-width: 60%; }
+.item-top .meta { margin-left: auto; }
+.plan-tag { font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+.plan-tag.p-pro { color: #6ee7b7; border-color: rgba(16,185,129,.5); background: rgba(16,185,129,.14); }
+.plan-tag.p-proplus { color: #7cc0ff; border-color: rgba(59,130,246,.5); background: rgba(59,130,246,.14); }
+.plan-tag.p-ultra { color: #e9d5ff; border-color: rgba(147,51,234,.55); background: rgba(147,51,234,.18); }
+.plan-tag.p-team { color: #fcd34d; border-color: rgba(245,158,11,.5); background: rgba(245,158,11,.14); }
+.plan-tag.p-free { color: var(--muted); }
+.usage { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); }
+.usage .up { min-width: 36px; color: #6ee7b7; font-weight: 700; }
+.usage .ubar { width: 120px; height: 6px; background: #1b2748; border: 1px solid #26324f; border-radius: 6px; overflow: hidden; flex-shrink: 0; }
+.usage .ubar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #10b981, #34d399); transition: width .3s ease; }
+.usage .ubar i.mid { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+.usage .ubar i.hi { background: linear-gradient(90deg, #ef4444, #f87171); }
+.usage .us { font-family: ui-monospace, Consolas, monospace; }
 .empty { color: var(--muted); text-align: center; padding: 18px; font-size: 13px; }
 
 .log {
@@ -118,3 +138,49 @@ textarea:focus { outline: none; border-color: var(--brand); }
 .log .l-prog .pbar { flex: 1; height: 8px; background: #1b2748; border: 1px solid #26324f; border-radius: 6px; overflow: hidden; }
 .log .l-prog .pbar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #2563eb, #7c3aed); transition: width .2s ease; }
 .log .l-prog .pp { color: #6ee7b7; min-width: 40px; text-align: right; }
+
+/* 本机 Cursor 补丁卡片 */
+.patchcard { flex-shrink: 0; }
+.patch-actions { display: flex; gap: 8px; }
+.pill {
+  display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 999px;
+  background: var(--panel2); color: var(--muted); border: 1px solid var(--line);
+  vertical-align: middle; margin-left: 6px;
+}
+.pill.ok { background: rgba(16, 185, 129, .16); color: #6ee7b7; border-color: rgba(16, 185, 129, .45); }
+.pill.warn { background: rgba(245, 158, 11, .16); color: #fcd34d; border-color: rgba(245, 158, 11, .45); }
+.patch-info { color: var(--muted); font-size: 12px; line-height: 1.6; margin: 6px 0 10px; word-break: break-all; }
+.patch-path { display: flex; gap: 8px; }
+.patch-path input {
+  flex: 1; min-width: 0; background: var(--panel2); color: var(--text); border: 1px solid var(--line);
+  border-radius: 9px; padding: 8px 10px; font-size: 12px; font-family: ui-monospace, Consolas, monospace;
+}
+.patch-path input:focus { outline: none; border-color: var(--brand); }
+
+/* ===== Tab 导航 ===== */
+.tabs { display: flex; gap: 2px; padding: 0 18px; background: var(--panel); border-bottom: 1px solid var(--line); flex-shrink: 0; }
+.tabbtn {
+  border: none; background: transparent; color: var(--muted); cursor: pointer;
+  padding: 11px 16px; font-size: 13px; font-weight: 600;
+  border-bottom: 2px solid transparent; margin-bottom: -1px; transition: color .15s, border-color .15s;
+}
+.tabbtn .ti { margin-right: 5px; }
+.tabbtn:hover { color: var(--text); }
+.tabbtn.active { color: var(--brand); border-bottom-color: var(--brand); }
+
+/* ===== Tab 面板 ===== */
+.tabpane { display: none; flex-direction: column; gap: 14px; flex: 1; min-height: 0; }
+.tabpane.active { display: flex; }
+
+/* ===== 补丁卡片（Tab 内）===== */
+.patch-hero { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.patch-hero-l { min-width: 0; }
+.patch-title { font-weight: 700; font-size: 15px; }
+.patch-note { color: var(--muted); font-size: 11.5px; line-height: 1.6; margin: 12px 0 0; }
+
+/* 打补丁 / 回退 进度条 */
+.patch-progress { margin-top: 14px; }
+.patch-progress .pp-head { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+.patch-progress .pp-head #patchProgressPct { color: #6ee7b7; font-weight: 700; }
+.patch-progress .pp-bar { height: 8px; background: #1b2748; border: 1px solid #26324f; border-radius: 6px; overflow: hidden; }
+.patch-progress .pp-bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #2563eb, #7c3aed); transition: width .3s ease; }

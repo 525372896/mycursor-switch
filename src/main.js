@@ -4,6 +4,8 @@ const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const cursor = require('./cursor');
 const store = require('./store');
+const patchEngine = require('./sand_patch_engine');
+const http2 = require('./http2');
 
 let win = null;
 const GITHUB_URL = 'https://github.com/525372896/mycursor-switch';
@@ -85,6 +87,7 @@ else {
 
   app.whenReady().then(() => {
     store.init(app.getPath('userData'));
+    try { patchEngine.setConfigDir(path.join(app.getPath('userData'), 'sand-patch')); } catch { /* ignore */ }
     createWindow();
     initUpdater();
     app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
@@ -127,6 +130,14 @@ ipcMain.handle('accounts:add', async (_e, rawToken) => {
 
 ipcMain.handle('accounts:remove', (_e, id) => ({ ok: store.remove(id) }));
 
+// 轻量额度（列表行懒加载）：套餐 + 总/Auto/API/Grok 百分比
+ipcMain.handle('accounts:usage', async (_e, id) => {
+  const rec = store.tokenById(id);
+  if (!rec) return { ok: false, msg: '账号不存在' };
+  try { return await cursor.fetchUsageBrief(rec.token); }
+  catch (e) { return { ok: false, msg: e.message }; }
+});
+
 ipcMain.handle('accounts:switch', async (_e, id) => {
   const rec = store.tokenById(id);
   if (!rec) return { ok: false, msg: '账号不存在（可能已删除）' };
@@ -168,4 +179,58 @@ ipcMain.handle('accounts:openUsage', async (_e, id) => {
   uw.loadFile(path.join(__dirname, 'renderer', 'usageview.html'), { search: q });
   log(`🌐 已用 ${title} 的登录态打开额度页（Usage / Spending）`);
   return { ok: true };
+});
+
+// ---------- 本机 Cursor 补丁（Sand Stream 客户端模式）----------
+function friendlyPatchErr(e) {
+  const m = (e && e.message) || String(e);
+  if (/EPERM|EACCES|EROFS|permission|拒绝访问|denied|read-only/i.test(m)) {
+    if (process.platform === 'darwin') {
+      return m + '（写入 Cursor.app 需要权限：若 Cursor 装在 /Applications，请以管理员权限运行本工具，或把 Cursor 移到「~/Applications」后重试）';
+    }
+    return m + '（写入 Cursor 目录需要权限：请先完全退出 Cursor，并以管理员身份运行本工具后重试）';
+  }
+  return m;
+}
+
+ipcMain.handle('patch:status', () => {
+  try { return patchEngine.patchStatus(); }
+  catch (e) { return { ok: false, error: (e && e.message) || String(e) }; }
+});
+
+ipcMain.handle('patch:setPath', (_e, p) => {
+  try { return patchEngine.setCursorPath(p || ''); }
+  catch (e) { return { ok: false, error: (e && e.message) || String(e) }; }
+});
+
+ipcMain.handle('patch:apply', async () => {
+  try {
+    log('⏳ 正在给本机 Cursor 打 Sand Stream 补丁（会自动关闭并重启 Cursor）…');
+    const r = await patchEngine.applyPatch({
+      onProgress: (percent, message) => { try { if (win) win.webContents.send('patch-progress', { percent, message }); } catch (e) { /* ignore */ } },
+      // HTTP 兼容模式静默切到 HTTP/2（用户无感知，不在日志中提示）
+      beforeStart: async () => { try { http2.setHttp2(true); } catch (e) { /* 静默处理 */ } },
+    });
+    log('✅ 补丁完成' + (r.noop ? '（已是最新，无需改动）' : '') + '。Cursor 已重启，Stream 模式已生效。');
+    return { ok: true, streamMode: !!r.streamMode, noop: !!r.noop };
+  } catch (e) {
+    const msg = friendlyPatchErr(e);
+    log('❌ 打补丁失败：' + msg);
+    return { ok: false, msg };
+  }
+});
+
+ipcMain.handle('patch:restore', async () => {
+  try {
+    log('⏳ 正在回退本机 Cursor 补丁（会自动关闭并重启 Cursor）…');
+    const r = await patchEngine.restorePatch({
+      onProgress: (percent, message) => { try { if (win) win.webContents.send('patch-progress', { percent, message }); } catch (e) { /* ignore */ } },
+    });
+    log('✅ 已回退补丁' + (r.noop ? '（本机没有补丁，无需改动）' : '') + '。Cursor 已重启。');
+    return { ok: true, noop: !!r.noop };
+  } catch (e) {
+    const msg = friendlyPatchErr(e);
+    log('❌ 回退失败：' + msg);
+    return { ok: false, msg };
+  }
 });

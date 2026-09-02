@@ -157,6 +157,40 @@ async function fetchUsage(rawToken) {
   return out;
 }
 
+// ---------- 轻量额度（列表行懒加载用）：只取套餐 + 总/Auto/API/Grok 百分比，够画一行额度条 ----------
+async function fetchUsageBrief(rawToken) {
+  const token = normalizeToken(rawToken);
+  if (!token) return { ok: false, msg: 'token 为空' };
+  const H = { 'User-Agent': UA, 'Accept': '*/*', 'Cookie': cookieHeader(token) };
+  const HJ = { ...H, 'Content-Type': 'application/json', 'Origin': 'https://cursor.com', 'Referer': 'https://cursor.com/dashboard' };
+  const out = { ok: true, membership: '', total: null, auto: null, api: null, grok: null };
+  // 套餐（顺便当登录态探测）
+  try {
+    const r = await fetch('https://cursor.com/api/usage-summary', { headers: H, redirect: 'follow' });
+    if (r.status === 401 || r.status === 403 || /workos|\/authorize|\/login/i.test(r.url || '')) {
+      return { ok: false, msg: 'token 已失效' };
+    }
+    const d = await r.json().catch(() => ({}));
+    out.membership = d.membershipType || '';
+  } catch (e) {
+    return { ok: false, msg: '连不上 cursor.com' };
+  }
+  // 本期用量：总% / Auto% / API%
+  try {
+    const r = await fetch('https://cursor.com/api/dashboard/get-current-period-usage', { method: 'POST', headers: HJ, body: '{}' });
+    const d = await r.json().catch(() => ({}));
+    const pu = d && d.planUsage;
+    if (pu) { out.total = num(pu.totalPercentUsed); out.auto = num(pu.autoPercentUsed); out.api = num(pu.apiPercentUsed); }
+  } catch { /* 单项失败不影响其它 */ }
+  // Grok Bot 用量%
+  try {
+    const r = await fetch('https://cursor.com/api/dashboard/get-sand-usage-status', { method: 'POST', headers: HJ, body: '{}' });
+    const d = await r.json().catch(() => ({}));
+    if ('usagePercent' in d) out.grok = num(d.usagePercent);
+  } catch { /* 忽略 */ }
+  return out;
+}
+
 // ---------- 深链握手（换号时用）：登记本机登录并取回桌面 access/refresh/authId ----------
 
 async function exchangeSession(fullToken, log) {
@@ -377,6 +411,6 @@ async function switchAccount(fullToken, email, log) {
 function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
 module.exports = {
-  normalizeToken, validateToken, fetchUsage, exchangeSession, switchAccount,
+  normalizeToken, validateToken, fetchUsage, fetchUsageBrief, exchangeSession, switchAccount,
   stateDbPath, stateDbExists,
 };

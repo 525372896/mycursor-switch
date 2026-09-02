@@ -15,27 +15,60 @@
         <div class="brand-sub">粘 token 加号 · 一键换号登录 Cursor</div>
       </div>
     </div>
-    <div id="status" class="status"></div>
+    <div class="topbar-right">
+      <div id="status" class="status"></div>
+      <button id="updateBtn" class="btn btn-ghost btn-sm">⬆ 检查更新</button>
+      <button id="aboutBtn" class="btn btn-ghost btn-sm">ℹ 关于</button>
+    </div>
   </header>
 
+  <!-- Tab 导航 -->
+  <nav class="tabs">
+    <button class="tabbtn active" data-tab="accounts"><span class="ti">👤</span> 账号管理</button>
+    <button class="tabbtn" data-tab="patch"><span class="ti">🩹</span> 本机 Cursor 补丁</button>
+  </nav>
+
   <main>
-    <!-- 工具条：加号按钮 + 刷新 + 计数 -->
-    <div class="toolbar">
-      <button id="addBtn" class="btn btn-primary">➕ 添加账号</button>
-      <button id="refreshBtn" class="btn btn-ghost">🔄 刷新</button>
-      <button id="updateBtn" class="btn btn-ghost">⬆ 检查更新</button>
-      <button id="aboutBtn" class="btn btn-ghost">ℹ 关于</button>
-      <span id="count" class="count"></span>
+    <!-- Tab 1: 账号管理 -->
+    <div class="tabpane active" id="tab-accounts">
+      <div class="toolbar">
+        <button id="addBtn" class="btn btn-primary">➕ 添加账号</button>
+        <button id="refreshBtn" class="btn btn-ghost">🔄 刷新</button>
+        <span id="count" class="count"></span>
+      </div>
+      <section class="listwrap">
+        <div id="list" class="list"></div>
+        <div id="empty" class="empty">还没有账号，点上面「➕ 添加账号」粘 token 加进来。</div>
+        <div id="pager" class="pager"></div>
+      </section>
     </div>
 
-    <!-- 账号分页列表（主内容） -->
-    <section class="listwrap">
-      <div id="list" class="list"></div>
-      <div id="empty" class="empty">还没有账号，点上面「➕ 添加账号」粘 token 加进来。</div>
-      <div id="pager" class="pager"></div>
-    </section>
+    <!-- Tab 2: 本机 Cursor 补丁（Sand Stream 客户端模式） -->
+    <div class="tabpane" id="tab-patch">
+      <section class="card patchcard" id="patchCard">
+        <div class="patch-hero">
+          <div class="patch-hero-l">
+            <div class="patch-title">🩹 本机 Cursor 补丁 <span class="pill" id="patchPill">检测中…</span></div>
+            <div class="patch-info" id="patchInfo">正在检测本机 Cursor 安装…</div>
+          </div>
+          <div class="patch-actions">
+            <button id="patchApplyBtn" class="btn btn-primary">打补丁</button>
+            <button id="patchRestoreBtn" class="btn btn-ghost">回退</button>
+          </div>
+        </div>
+        <div class="patch-path">
+          <input type="text" id="cursorPathInput" spellcheck="false" placeholder="自定义 Cursor 路径（Cursor.exe / Cursor.app / resources/app / 安装目录），留空=自动检测" />
+          <button id="cursorPathBtn" class="btn">设置路径</button>
+        </div>
+        <div class="patch-progress" id="patchProgress" hidden>
+          <div class="pp-head"><span id="patchProgressText">处理中…</span><span id="patchProgressPct">0%</span></div>
+          <div class="pp-bar"><i id="patchProgressBar"></i></div>
+        </div>
+        <p class="patch-note">打补丁 / 回退都会自动关闭并重启 Cursor，请先保存 Cursor 里的工作。macOS 首次使用可能需要授予权限。</p>
+      </section>
+    </div>
 
-    <!-- 日志（换号进度/结果） -->
+    <!-- 公用日志（换号 / 补丁 进度与结果） -->
     <section class="card logcard">
       <div class="card-head"><div class="card-title">📜 日志</div><button id="clearLog" class="btn btn-ghost btn-sm">清空</button></div>
       <div id="log" class="log"></div>
