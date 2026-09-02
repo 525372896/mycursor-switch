@@ -362,6 +362,20 @@ if ($('blockUpdateChk')) {
   };
 }
 
+// Stream 直连模式开关（默认开；关闭=基础模式，可用 Composer 模型）
+async function loadStreamDirect() {
+  try { const on = await window.api.getStreamDirect(); const c = $('streamDirectChk'); if (c) c.checked = on !== false; } catch (e) { /* ignore */ }
+}
+if ($('streamDirectChk')) {
+  $('streamDirectChk').onchange = async (e) => {
+    const on = e.target.checked;
+    try {
+      await window.api.setStreamDirect(on);
+      logLine(on ? '⚡ 已选 Stream 直连模式（点「打补丁」生效）' : '🧩 已选基础模式：可用 grok-4.6-xhigh-fast 等 Composer 模型（点「打补丁」生效）');
+    } catch (err) { logLine('❌ ' + err.message); }
+  };
+}
+
 // ---- Tab 切换 ----
 function switchTab(name) {
   document.querySelectorAll('.tabbtn').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
@@ -378,3 +392,4 @@ loadStatus();
 loadList();
 loadPatchStatus();
 loadBlockUpdate();
+loadStreamDirect();

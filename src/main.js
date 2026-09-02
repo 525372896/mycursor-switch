@@ -211,6 +211,7 @@ ipcMain.handle('patch:apply', async () => {
   try {
     log('⏳ 正在给本机 Cursor 打 Sand Stream 补丁（会自动关闭并重启 Cursor）…');
     const r = await patchEngine.applyPatch({
+      preferStream: getStreamDirect(),   // 用户开关：Stream 直连 or 基础模式
       onProgress: (percent, message) => { try { if (win) win.webContents.send('patch-progress', { percent, message }); } catch (e) { /* ignore */ } },
       // HTTP 兼容模式静默切到 HTTP/2（用户无感知，不在日志中提示）
       beforeStart: async () => { try { http2.setHttp2(true); } catch (e) { /* 静默处理 */ } },
@@ -255,4 +256,13 @@ ipcMain.handle('prefs:setBlockUpdate', (_e, on) => {
   try { applied = cursorSettings.setAutoUpdateBlocked(!!on).ok; } catch (e) { /* ignore */ }
   log(on ? '🔒 已禁止 Cursor 自动更新（update.mode=none，重启 Cursor 后生效）' : '🔓 已恢复 Cursor 自动更新');
   return { ok: true, applied };
+});
+
+// Stream 直连模式偏好（默认开）：关闭=基础模式，可用 grok-4.6-xhigh-fast 等 Composer 模型
+function getStreamDirect() { return readPrefs().streamDirect !== false; }
+ipcMain.handle('prefs:getStreamDirect', () => getStreamDirect());
+ipcMain.handle('prefs:setStreamDirect', (_e, on) => {
+  const p = readPrefs(); p.streamDirect = !!on; writePrefs(p);
+  log(on ? '⚡ 已选择 Stream 直连模式（点「打补丁」后生效）' : '🧩 已选择基础模式：可用 Composer 模型（如 grok-4.6-xhigh-fast），点「打补丁」后生效');
+  return { ok: true };
 });

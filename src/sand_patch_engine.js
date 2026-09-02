@@ -400,6 +400,8 @@ function buildInstallPlan(layout, includeStream = true) {
   for (const target of layout.targetPaths) {
     const original = readPlannedFile(target);
     let content = decodeJs(original.original);
+    // 先清成干净基线，保证能在 Stream / 基础 两种模式之间正确互切（去掉可能已存在的另一种补丁）
+    content = removePatchFromContent(content)[0];
     [content] = stripRpcSnippets(content);
     const isMem = MEMBERSHIP_TARGET_NAMES.includes(path.basename(target));
     if (isMem) content = content.replace(memRe, '');
@@ -539,17 +541,19 @@ async function install(layout, opts = {}) {
   prog(15, '生成补丁方案…');
   // 先按「含 Stream」试算；能凑齐五件套就打 Stream，否则降级为「只打基础 sand 补丁」（全或无，绝不打半套）。
   let { plan, total } = buildInstallPlan(layout, true);
+  // buildInstallPlan 已「先清干净再打」，故 total 五件套 = 该 Cursor 版本在干净基线上的 Stream 命中能力。
   const streamHits = [
-    before.managedLocalRouteMarkers + total.managed_local_route,
-    before.localRuntimeLoadMarkers + total.local_runtime_load,
-    before.agentHostIdentityMarkers + total.agent_host_identity,
-    before.moveExecMarkers + total.move_exec,
-    before.agentHostEnablementMarkers + total.agent_host_enablement,
+    total.managed_local_route || 0,
+    total.local_runtime_load || 0,
+    total.agent_host_identity || 0,
+    total.move_exec || 0,
+    total.agent_host_enablement || 0,
   ];
   const want = [1, 1, 1, 1, 2];
-  let wantStream = before.streamModeInstalled || want.every((v, i) => streamHits[i] === v);
+  let wantStream = want.every((v, i) => streamHits[i] === v);
+  if (opts.preferStream === false) wantStream = false;   // 用户在开关里选择了「基础模式」
   if (!wantStream) {
-    // 降级：跳过五件套，只打基础 sand 补丁（client-type 等版本无关部分）
+    // 基础模式：跳过五件套，只打基础 sand 补丁（client-type 等版本无关部分）；可用 Composer 模型
     ({ plan, total } = buildInstallPlan(layout, false));
   }
   if (!Object.keys(plan).length) {
