@@ -352,18 +352,32 @@ function findCursorExeWin() {
   return null;
 }
 
+// 兜底定位 Cursor 可执行文件：复用补丁引擎的全套探测（注册表 + 用户设的自定义路径 + 各盘默认目录 +
+// 运行进程）。解决「装在非标准盘（如 E:\cursor\cursor）且换号时 Cursor 已关闭 → 固定候选找不到 → 拉不起来」。
+function resolveCursorExe() {
+  try {
+    const layout = require('./sand_patch_engine').resolveCursorLayout();
+    if (layout && layout.executable && fs.existsSync(layout.executable)) return layout.executable;
+  } catch { /* ignore */ }
+  return null;
+}
+
 async function launchCursor(preferWinExe) {
   try {
     if (process.platform === 'win32') {
-      const exe = preferWinExe || findCursorExeWin();
-      if (exe) {
+      const exe = preferWinExe || findCursorExeWin() || resolveCursorExe();
+      if (exe && fs.existsSync(exe)) {
         try { await shell.openPath(exe); }   // 用系统关联打开 exe，不弹 cmd 黑框
         catch { spawn(exe, [], { detached: true, stdio: 'ignore', windowsHide: true }).unref(); }
         return true;
       }
       return false;   // 找不到 Cursor 就不强开（绝不再 cmd/start 弹黑框），用户手动打开即可
     }
-    if (process.platform === 'darwin') { await run('open', ['-a', 'Cursor']); return true; }
+    if (process.platform === 'darwin') {
+      const exe = resolveCursorExe();   // 补丁引擎能定位到 Cursor.app 内的可执行
+      if (exe) { spawn(exe, [], { detached: true, stdio: 'ignore' }).unref(); return true; }
+      await run('open', ['-a', 'Cursor']); return true;
+    }
     spawn('cursor', [], { detached: true, stdio: 'ignore' }).unref();
     return true;
   } catch { return false; }
@@ -397,14 +411,15 @@ async function switchAccount(fullToken, email, log) {
   for (let i = 0; i < 6 && isDbLocked(); i++) await sleep(300);
   writeKeys(access, refresh, userId, email || '');
 
-  // 3) 重启
-  await launchCursor(winExe);
+  // 3) 重启（按真实结果反馈：拉起失败就提示手动打开，不再谎报已重启）
+  const launched = await launchCursor(winExe);
+  const startPart = launched ? '并已重启 Cursor' : '，但没能自动拉起 Cursor，请手动打开一次';
+  const authPart = handshakeOk ? '（登录握手完成，聊天可直接用）' : '（握手失败，若聊天报 auth error 请在 Cursor 里手动重登一次）';
   return {
     ok: true,
     handshakeOk,
-    msg: handshakeOk
-      ? `已切换到 ${email || '该账号'} 并重启 Cursor（已完成登录握手，聊天可直接用）。`
-      : `已切换到 ${email || '该账号'} 并重启（握手失败，若聊天报 auth error 请在 Cursor 里手动重登一次）。`,
+    launched,
+    msg: `已切换到 ${email || '该账号'}${startPart}${authPart}。`,
   };
 }
 

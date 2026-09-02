@@ -287,7 +287,7 @@ const CLIENT_RULES = [
 ];
 
 // ---------------- apply ----------------
-function applyPatchToContent(content) {
+function applyPatchToContent(content, includeStream = true) {
   const stats = newStats();
   let next = content;
 
@@ -396,32 +396,35 @@ function applyPatchToContent(content) {
     next = n; stats.rpc_rewrite += c;
   }
 
-  // 11) managed-local Stream 五件套（注入）
-  {
-    const c = countOcc(next, MANAGED_LOCAL_ROUTE_ORIGINAL);
-    if (c) { next = replaceAllLiteral(next, MANAGED_LOCAL_ROUTE_ORIGINAL, MANAGED_LOCAL_ROUTE_PATCHED); stats.managed_local_route += c; }
-  }
-  {
-    const c = countOcc(next, LOCAL_RUNTIME_LOAD_ORIGINAL);
-    if (c) { next = replaceAllLiteral(next, LOCAL_RUNTIME_LOAD_ORIGINAL, LOCAL_RUNTIME_LOAD_PATCHED); stats.local_runtime_load += c; }
-  }
-  {
-    const c = countOcc(next, AGENT_HOST_IDENTITY_ORIGINAL);
-    if (c) { next = replaceAllLiteral(next, AGENT_HOST_IDENTITY_ORIGINAL, AGENT_HOST_IDENTITY_PATCHED); stats.agent_host_identity += c; }
-  }
-  {
-    const c = countOcc(next, MOVE_EXEC_GATE_ORIGINAL);
-    if (c) { next = replaceAllLiteral(next, MOVE_EXEC_GATE_ORIGINAL, MOVE_EXEC_GATE_PATCHED); stats.move_exec += c; }
+  // 11) managed-local Stream 五件套（注入）— 仅 Stream 模式（includeStream）时打，
+  //     且由 engine 保证「全或无」：凑不齐五件套时会以 includeStream=false 重打，绝不打半套。
+  if (includeStream) {
+    {
+      const c = countOcc(next, MANAGED_LOCAL_ROUTE_ORIGINAL);
+      if (c) { next = replaceAllLiteral(next, MANAGED_LOCAL_ROUTE_ORIGINAL, MANAGED_LOCAL_ROUTE_PATCHED); stats.managed_local_route += c; }
+    }
+    {
+      const c = countOcc(next, LOCAL_RUNTIME_LOAD_ORIGINAL);
+      if (c) { next = replaceAllLiteral(next, LOCAL_RUNTIME_LOAD_ORIGINAL, LOCAL_RUNTIME_LOAD_PATCHED); stats.local_runtime_load += c; }
+    }
+    {
+      const c = countOcc(next, AGENT_HOST_IDENTITY_ORIGINAL);
+      if (c) { next = replaceAllLiteral(next, AGENT_HOST_IDENTITY_ORIGINAL, AGENT_HOST_IDENTITY_PATCHED); stats.agent_host_identity += c; }
+    }
+    {
+      const c = countOcc(next, MOVE_EXEC_GATE_ORIGINAL);
+      if (c) { next = replaceAllLiteral(next, MOVE_EXEC_GATE_ORIGINAL, MOVE_EXEC_GATE_PATCHED); stats.move_exec += c; }
+    }
   }
 
-  // 12) 剥离 1.1.0–1.1.3 的 createPromptSession 短路
+  // 12) 剥离 1.1.0–1.1.3 的 createPromptSession 短路（清理旧状态，始终执行）
   {
     const [n, c] = stripDirectStreamInjection(next);
     next = n; stats.direct_stream += c;
   }
 
-  // 13) 强制开启 agent-host（只改第一个）
-  if (!next.includes(SAND_AGENT_HOST_ENABLEMENT_MARKER)) {
+  // 13) 强制开启 agent-host（只改第一个）— 仅 Stream 模式
+  if (includeStream && !next.includes(SAND_AGENT_HOST_ENABLEMENT_MARKER)) {
     const re = new RegExp('(this\\._agentHostEnabled=)([A-Za-z_$][A-Za-z0-9_$]*)(,)');
     const [n, c] = subnOnce(next, re, (m, g1, variable, g3) =>
       variable + '=!0;' + SAND_AGENT_HOST_ENABLEMENT_MARKER + g1 + variable + g3);

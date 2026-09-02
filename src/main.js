@@ -6,6 +6,8 @@ const cursor = require('./cursor');
 const store = require('./store');
 const patchEngine = require('./sand_patch_engine');
 const http2 = require('./http2');
+const cursorSettings = require('./cursor_settings');
+const fs = require('fs');
 
 let win = null;
 const GITHUB_URL = 'https://github.com/525372896/mycursor-switch';
@@ -89,6 +91,8 @@ else {
     store.init(app.getPath('userData'));
     try { patchEngine.setConfigDir(path.join(app.getPath('userData'), 'sand-patch')); } catch { /* ignore */ }
     createWindow();
+    // 默认禁止 Cursor 自动更新（防止升级后补丁失效）；用户可在补丁 Tab 关掉此开关
+    try { if (getBlockUpdate()) cursorSettings.setAutoUpdateBlocked(true); } catch { /* ignore */ }
     initUpdater();
     app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
   });
@@ -211,8 +215,11 @@ ipcMain.handle('patch:apply', async () => {
       // HTTP 兼容模式静默切到 HTTP/2（用户无感知，不在日志中提示）
       beforeStart: async () => { try { http2.setHttp2(true); } catch (e) { /* 静默处理 */ } },
     });
-    log('✅ 补丁完成' + (r.noop ? '（已是最新，无需改动）' : '') + '。Cursor 已重启，Stream 模式已生效。');
-    return { ok: true, streamMode: !!r.streamMode, noop: !!r.noop };
+    const mode = r.streamMode
+      ? 'Stream 模式已生效'
+      : '基础模式已生效（当前 Cursor 版本未匹配 Stream 直连，核心 sand 功能可用）';
+    log('✅ 补丁完成' + (r.noop ? '（已是最新，无需改动）' : '') + '。Cursor 已重启，' + mode + '。');
+    return { ok: true, streamMode: !!r.streamMode, basicMode: !!r.basicMode, noop: !!r.noop };
   } catch (e) {
     const msg = friendlyPatchErr(e);
     log('❌ 打补丁失败：' + msg);
@@ -233,4 +240,19 @@ ipcMain.handle('patch:restore', async () => {
     log('❌ 回退失败：' + msg);
     return { ok: false, msg };
   }
+});
+
+// ---------- 偏好：禁止 Cursor 自动更新开关（默认开启）----------
+function prefsPath() { return path.join(app.getPath('userData'), 'prefs.json'); }
+function readPrefs() { try { return JSON.parse(fs.readFileSync(prefsPath(), 'utf8')); } catch { return {}; } }
+function writePrefs(o) { try { fs.mkdirSync(path.dirname(prefsPath()), { recursive: true }); fs.writeFileSync(prefsPath(), JSON.stringify(o, null, 2)); } catch { /* ignore */ } }
+function getBlockUpdate() { return readPrefs().blockCursorUpdate !== false; }   // 未设置过默认视为 true
+
+ipcMain.handle('prefs:getBlockUpdate', () => getBlockUpdate());
+ipcMain.handle('prefs:setBlockUpdate', (_e, on) => {
+  const p = readPrefs(); p.blockCursorUpdate = !!on; writePrefs(p);
+  let applied = false;
+  try { applied = cursorSettings.setAutoUpdateBlocked(!!on).ok; } catch (e) { /* ignore */ }
+  log(on ? '🔒 已禁止 Cursor 自动更新（update.mode=none，重启 Cursor 后生效）' : '🔓 已恢复 Cursor 自动更新');
+  return { ok: true, applied };
 });

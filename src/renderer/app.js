@@ -284,10 +284,10 @@ async function loadPatchStatus() {
       restoreBtn.disabled = false;
       info.textContent = `Cursor ${s.version} · ${s.path} · Stream 回路已启用（本机已打补丁）`;
     } else if (s.installed) {
-      pill.className = 'pill warn'; pill.textContent = '已装旧补丁';
-      applyBtn.textContent = '升级补丁'; applyBtn.className = 'btn btn-primary';
+      pill.className = 'pill ok'; pill.textContent = '✓ 已打补丁（基础）';
+      applyBtn.textContent = '重新打补丁'; applyBtn.className = 'btn btn-ghost';
       restoreBtn.disabled = false;
-      info.textContent = `Cursor ${s.version} · ${s.path} · 检测到旧补丁，建议点「升级补丁」`;
+      info.textContent = `Cursor ${s.version} · ${s.path} · 基础模式已生效（当前版本未匹配 Stream 直连）`;
     } else {
       pill.className = 'pill'; pill.textContent = '未打补丁';
       applyBtn.textContent = '打补丁'; applyBtn.className = 'btn btn-primary';
@@ -310,7 +310,7 @@ async function doPatchApply() {
   try {
     const r = await window.api.patchApply();
     if (!r.ok) { logLine('❌ ' + (r.msg || '打补丁失败')); setPatchProgress(0, '打补丁失败'); }
-    else setPatchProgress(100, r.noop ? '已是最新，无需改动' : '补丁完成，Cursor 已重启');
+    else setPatchProgress(100, r.noop ? '已是最新' : (r.basicMode ? '完成（基础模式）' : '完成（Stream 模式）'));
   } catch (e) { logLine('❌ ' + e.message); setPatchProgress(0, '出错：' + e.message); }
   setTimeout(hidePatchProgress, 1500);
   await loadPatchStatus();
@@ -348,6 +348,20 @@ $('patchApplyBtn').onclick = doPatchApply;
 $('patchRestoreBtn').onclick = doPatchRestore;
 $('cursorPathBtn').onclick = doPatchSetPath;
 
+// 禁止 Cursor 自动更新开关（默认开启）
+async function loadBlockUpdate() {
+  try { const on = await window.api.getBlockUpdate(); const c = $('blockUpdateChk'); if (c) c.checked = on !== false; } catch (e) { /* ignore */ }
+}
+if ($('blockUpdateChk')) {
+  $('blockUpdateChk').onchange = async (e) => {
+    const on = e.target.checked;
+    try {
+      await window.api.setBlockUpdate(on);
+      logLine(on ? '🔒 已禁止 Cursor 自动更新（重启 Cursor 后生效）' : '🔓 已恢复 Cursor 自动更新');
+    } catch (err) { logLine('❌ ' + err.message); }
+  };
+}
+
 // ---- Tab 切换 ----
 function switchTab(name) {
   document.querySelectorAll('.tabbtn').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
@@ -363,3 +377,4 @@ window.api.onPatchProgress((p) => setPatchProgress(p.percent, p.message));
 loadStatus();
 loadList();
 loadPatchStatus();
+loadBlockUpdate();

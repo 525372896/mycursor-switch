@@ -184,3 +184,8 @@ textarea:focus { outline: none; border-color: var(--brand); }
 .patch-progress .pp-head #patchProgressPct { color: #6ee7b7; font-weight: 700; }
 .patch-progress .pp-bar { height: 8px; background: #1b2748; border: 1px solid #26324f; border-radius: 6px; overflow: hidden; }
 .patch-progress .pp-bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #2563eb, #7c3aed); transition: width .3s ease; }
+
+/* 禁止自动更新开关 */
+.patch-toggle { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 12px; color: var(--text); cursor: pointer; user-select: none; }
+.patch-toggle input { width: 15px; height: 15px; cursor: pointer; accent-color: var(--brand); }
+.patch-toggle span { color: var(--muted); }

@@ -16,6 +16,8 @@ contextBridge.exposeInMainWorld('api', {
   patchApply: () => ipcRenderer.invoke('patch:apply'),
   patchRestore: () => ipcRenderer.invoke('patch:restore'),
   patchSetPath: (p) => ipcRenderer.invoke('patch:setPath', p),
+  getBlockUpdate: () => ipcRenderer.invoke('prefs:getBlockUpdate'),
+  setBlockUpdate: (on) => ipcRenderer.invoke('prefs:setBlockUpdate', on),
   onProgress: (cb) => ipcRenderer.on('update-progress', (_e, pct) => cb(pct)),
   onLog: (cb) => ipcRenderer.on('log', (_e, line) => cb(line)),
   onPatchProgress: (cb) => ipcRenderer.on('patch-progress', (_e, p) => cb(p)),

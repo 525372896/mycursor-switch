@@ -393,7 +393,7 @@ function inspectStatus(layout) {
 
 // ---------------- plan 构建 ----------------
 function addStats(total, s) { for (const k of Object.keys(s)) total[k] = (total[k] || 0) + s[k]; return total; }
-function buildInstallPlan(layout) {
+function buildInstallPlan(layout, includeStream = true) {
   const plan = {};
   const total = {};
   const memRe = new RegExp(MEMBERSHIP_SNIPPET_RE_SRC, 'g');
@@ -403,7 +403,7 @@ function buildInstallPlan(layout) {
     [content] = stripRpcSnippets(content);
     const isMem = MEMBERSHIP_TARGET_NAMES.includes(path.basename(target));
     if (isMem) content = content.replace(memRe, '');
-    let [next, stats] = applyPatchToContent(content);
+    let [next, stats] = applyPatchToContent(content, includeStream);
     if (isMem) next = SAND_MEMBERSHIP_SNIPPET + next;
     if (next !== content) plan[normKey(target)] = { path: target, original: original.original, nextBytes: Buffer.from(next, 'utf8'), mode: original.mode };
     addStats(total, stats);
@@ -537,16 +537,8 @@ async function install(layout, opts = {}) {
   const before = inspectStatus(layout);
   if (before.externalMarkerCount) throw new SandToolError('检测到其他 Sand 模式标记，本工具不会接管或覆盖它；请先用原安装方式卸载');
   prog(15, '生成补丁方案…');
-  const { plan, total } = buildInstallPlan(layout);
-  if (!Object.keys(plan).length) {
-    if (before.installed && (!before.streamCapable || before.streamModeInstalled)) {
-      prog(35, '关闭 Cursor…'); await closeCursor(layout);
-      prog(90, '配置 HTTP/2…'); if (opts.beforeStart) await opts.beforeStart(layout);
-      prog(95, '重启 Cursor…'); startCursor(layout);
-      prog(100, '完成（已是最新，无需改动）'); return { ok: true, noop: true };
-    }
-    throw new SandToolError('当前 Cursor 版本未匹配到 Sand 客户端模式规则');
-  }
+  // 先按「含 Stream」试算；能凑齐五件套就打 Stream，否则降级为「只打基础 sand 补丁」（全或无，绝不打半套）。
+  let { plan, total } = buildInstallPlan(layout, true);
   const streamHits = [
     before.managedLocalRouteMarkers + total.managed_local_route,
     before.localRuntimeLoadMarkers + total.local_runtime_load,
@@ -554,11 +546,21 @@ async function install(layout, opts = {}) {
     before.moveExecMarkers + total.move_exec,
     before.agentHostEnablementMarkers + total.agent_host_enablement,
   ];
-  const streamCapable = before.streamCapable || streamHits.some((x) => x > 0);
   const want = [1, 1, 1, 1, 2];
-  if (streamCapable && !want.every((v, i) => streamHits[i] === v)) {
-    throw new SandToolError('当前 Cursor 版本未完整匹配 Sand Stream 规则：' +
-      `route=${streamHits[0]}, runtimeLoad=${streamHits[1]}, identity=${streamHits[2]}, moveExec=${streamHits[3]}, agentHost=${streamHits[4]}`);
+  let wantStream = before.streamModeInstalled || want.every((v, i) => streamHits[i] === v);
+  if (!wantStream) {
+    // 降级：跳过五件套，只打基础 sand 补丁（client-type 等版本无关部分）
+    ({ plan, total } = buildInstallPlan(layout, false));
+  }
+  if (!Object.keys(plan).length) {
+    if (before.installed) {
+      prog(35, '关闭 Cursor…'); await closeCursor(layout);
+      prog(90, '配置 HTTP/2…'); if (opts.beforeStart) await opts.beforeStart(layout);
+      prog(95, '重启 Cursor…'); startCursor(layout);
+      prog(100, '完成（已是最新，无需改动）');
+      return { ok: true, noop: true, streamMode: before.streamModeInstalled, basicMode: before.installed && !before.streamModeInstalled };
+    }
+    throw new SandToolError('当前 Cursor 版本未匹配到 Sand 补丁规则（连基础 client-type 锚点都没命中，可能 Cursor 版本差异过大或使用了 app.asar 打包）');
   }
   prog(35, '关闭 Cursor…');
   await closeCursor(layout);
@@ -566,10 +568,12 @@ async function install(layout, opts = {}) {
   const validator = () => {
     const status = inspectStatus(layout);
     if (!status.installed || status.ideMatches !== 0 || status.externalMarkerCount !== 0 ||
-      status.legacyClientMarkers !== 0 || status.legacyEligibilityMarkers !== 0 ||
-      (streamCapable && !status.streamModeInstalled)) {
+      status.legacyClientMarkers !== 0 || status.legacyEligibilityMarkers !== 0) {
       throw new SandToolError('安装后状态校验失败：' +
-        `remainingIde=${status.ideMatches}, streamMode=${status.streamModeInstalled}`);
+        `installed=${status.installed}, remainingIde=${status.ideMatches}`);
+    }
+    if (wantStream && !status.streamModeInstalled) {
+      throw new SandToolError('Stream 模式安装后校验失败（五件套未全部生效）');
     }
     verifyExtensionHashes(layout, changedExt);
     verifyProductChecksums(layout);
@@ -584,7 +588,7 @@ async function install(layout, opts = {}) {
   prog(95, '重启 Cursor…');
   startCursor(layout);
   prog(100, '完成');
-  return { ok: true, streamMode: streamCapable };
+  return { ok: true, streamMode: wantStream, basicMode: !wantStream };
 }
 async function uninstall(layout, opts = {}) {
   const prog = (p, m) => { try { if (opts.onProgress) opts.onProgress(p, m); } catch (e) { /* ignore */ } };
