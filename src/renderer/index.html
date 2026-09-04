@@ -45,35 +45,91 @@
 
     <!-- Tab 2: 本机 Cursor 补丁（Sand Stream 客户端模式） -->
     <div class="tabpane" id="tab-patch">
-      <section class="card patchcard" id="patchCard">
-        <div class="patch-hero">
-          <div class="patch-hero-l">
-            <div class="patch-title">🩹 本机 Cursor 补丁 <span class="pill" id="patchPill">检测中…</span></div>
-            <div class="patch-info" id="patchInfo">正在检测本机 Cursor 安装…</div>
+      <div class="patch-scroll">
+        <!-- 顶部：标题 + 状态 + 动作 -->
+        <section class="card patch-hero-card">
+          <div class="patch-hero">
+            <div class="patch-hero-l">
+              <div class="patch-title">🩹 GrokBot 模式 <span class="pill" id="patchPill">检测中…</span></div>
+              <div class="patch-info" id="patchInfo">把 Cursor 的客户端标识切到 GrokBot，并让对话走本地 agent-host。改动逐文件备份、写完自动校验，出问题会整体回滚。</div>
+            </div>
+            <div class="patch-actions">
+              <label class="patch-switch" title="Stream 直连模式（默认开；关闭=基础模式，可用 grok-4.6-xhigh-fast 等 Composer 模型）">
+                <span class="sw-label">GrokBot Stream</span>
+                <input type="checkbox" id="streamDirectChk" checked /><i></i>
+              </label>
+              <button id="patchRefreshBtn" class="btn btn-ghost btn-sm" title="重新扫描本机 Cursor">刷新</button>
+              <button id="patchRestoreBtn" class="btn btn-ghost btn-sm">卸载</button>
+              <button id="patchApplyBtn" class="btn btn-primary">打补丁</button>
+            </div>
           </div>
-          <div class="patch-actions">
-            <button id="patchApplyBtn" class="btn btn-primary">打补丁</button>
-            <button id="patchRestoreBtn" class="btn btn-ghost">回退</button>
+          <div class="patch-banner" id="patchBanner" hidden></div>
+          <div class="patch-progress" id="patchProgress" hidden>
+            <div class="pp-head"><span id="patchProgressText">处理中…</span><span id="patchProgressPct">0%</span></div>
+            <div class="pp-bar"><i id="patchProgressBar"></i></div>
           </div>
+        </section>
+
+        <div class="patch-grid">
+          <!-- 左：安装状态 -->
+          <section class="card patch-col">
+            <div class="card-head">
+              <div class="card-title">安装状态</div>
+              <span class="muted" id="patchVersion">—</span>
+            </div>
+            <div class="stat-grid">
+              <div class="stat" id="statClient"><div class="stat-k">客户端标识</div><div class="stat-v">—</div><div class="stat-d">已切到 GrokBot</div></div>
+              <div class="stat" id="statStream"><div class="stat-k">Stream 模式</div><div class="stat-v">—</div><div class="stat-d">对话走 agent-host</div></div>
+              <div class="stat" id="statElig"><div class="stat-k">资格与会员</div><div class="stat-v">—</div><div class="stat-d">被短路的判定</div></div>
+              <div class="stat" id="statIde"><div class="stat-k">未接管位点</div><div class="stat-v">—</div><div class="stat-d">认得但没改的</div></div>
+              <div class="stat stat-wide" id="statProc"><div class="stat-k">运行进程</div><div class="stat-v">—</div><div class="stat-d">改文件前会先关掉 Cursor</div></div>
+            </div>
+            <div class="patch-external" id="patchExternal" hidden></div>
+            <div class="files-head">
+              <span id="filesSummary">目标文件 — 个 · 已改 — 个</span>
+              <span class="files-tools">
+                <label class="files-filter"><input type="checkbox" id="filesOnlyPatched" checked /> 只看已改</label>
+                <button class="btn btn-ghost btn-xs" id="kvInstallOpen" title="在资源管理器中打开 Cursor 安装目录">📂 安装目录</button>
+              </span>
+            </div>
+            <div class="files-list" id="filesList"></div>
+            <div class="files-hint">点文件名看改了哪几处 · 点 <b>⧉</b> 在资源管理器中定位</div>
+            <div class="patch-path">
+              <input type="text" id="cursorPathInput" spellcheck="false" placeholder="自定义 Cursor 路径（Cursor.exe / Cursor.app / resources/app / 安装目录），留空=自动检测" />
+              <button id="cursorPathBtn" class="btn btn-sm">设置路径</button>
+            </div>
+            <label class="patch-toggle">
+              <input type="checkbox" id="blockUpdateChk" checked />
+              <span>禁止 Cursor 自动更新（推荐：防止 Cursor 升级到新版本后补丁失效）</span>
+            </label>
+          </section>
+
+          <!-- 右：实时会话 -->
+          <section class="card patch-col">
+            <div class="card-head">
+              <div class="card-title">实时会话 <span class="sess-op" id="sessOp"></span></div>
+              <span class="muted" id="sessElapsed"><i class="dot-live"></i>待命</span>
+            </div>
+            <ol class="steps" id="steps">
+              <li data-step="locate"><span class="st-name">定位 Cursor</span><span class="st-detail"></span><span class="st-ms"></span></li>
+              <li data-step="scan"><span class="st-name">扫描当前状态</span><span class="st-detail"></span><span class="st-ms"></span></li>
+              <li data-step="plan"><span class="st-name">生成改写计划</span><span class="st-detail"></span><span class="st-ms"></span></li>
+              <li data-step="close"><span class="st-name">关闭 Cursor</span><span class="st-detail"></span><span class="st-ms"></span></li>
+              <li data-step="write"><span class="st-name">备份并写入</span><span class="st-detail"></span><span class="st-ms"></span></li>
+              <li data-step="verify"><span class="st-name">完整性校验</span><span class="st-detail"></span><span class="st-ms"></span></li>
+              <li data-step="restart"><span class="st-name">重新启动 Cursor</span><span class="st-detail"></span><span class="st-ms"></span></li>
+            </ol>
+            <!-- 逐文件动画：写入/还原时每个文件一行，状态 待写入 → 写入中 → 已写入/已还原 -->
+            <div class="sess-files" id="sessFiles" hidden>
+              <div class="sf-head"><span id="sfTitle">文件</span><span class="sf-count" id="sfCount"></span></div>
+              <div class="sf-list" id="sfList"></div>
+            </div>
+            <div class="sess-log" id="sessLog"><div class="sess-empty">点「打补丁」或「卸载」后，这里会逐条显示改了哪些文件、写到哪一步。</div></div>
+            <div class="sess-foot" id="sessFoot" hidden><button class="btn btn-ghost btn-xs" id="sessBackupBtn">📂 打开本次备份目录</button></div>
+          </section>
         </div>
-        <div class="patch-path">
-          <input type="text" id="cursorPathInput" spellcheck="false" placeholder="自定义 Cursor 路径（Cursor.exe / Cursor.app / resources/app / 安装目录），留空=自动检测" />
-          <button id="cursorPathBtn" class="btn">设置路径</button>
-        </div>
-        <div class="patch-progress" id="patchProgress" hidden>
-          <div class="pp-head"><span id="patchProgressText">处理中…</span><span id="patchProgressPct">0%</span></div>
-          <div class="pp-bar"><i id="patchProgressBar"></i></div>
-        </div>
-        <label class="patch-toggle">
-          <input type="checkbox" id="blockUpdateChk" checked />
-          <span>禁止 Cursor 自动更新（推荐：防止 Cursor 升级到新版本后补丁失效）</span>
-        </label>
-        <label class="patch-toggle">
-          <input type="checkbox" id="streamDirectChk" checked />
-          <span>Stream 直连模式（默认开；关闭=基础模式，可用 grok-4.6-xhigh-fast 等 Composer 模型）</span>
-        </label>
-        <p class="patch-note">打补丁 / 回退都会自动关闭并重启 Cursor，请先保存 Cursor 里的工作。macOS 首次使用可能需要授予权限。</p>
-      </section>
+        <p class="patch-note">打补丁 / 卸载都会自动关闭并重启 Cursor，请先保存 Cursor 里的工作。打补丁之前请先确认当前 Cursor 账号已拿到 GrokBot 资格，否则改完也用不了。macOS 首次使用可能需要授予权限。</p>
+      </div>
     </div>
 
     <!-- 公用日志（换号 / 补丁 进度与结果） -->
@@ -94,6 +150,34 @@
           <button id="addSubmit" class="btn btn-primary">校验并添加</button>
           <span id="addMsg" class="msg"></span>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 模型探测结果 -->
+  <div id="probeModal" class="modal-hide">
+    <div class="sheet">
+      <div class="shead"><span id="probeTitle">模型探测</span><button class="x" id="probeClose">×</button></div>
+      <div class="sbody">
+        <p class="hint">走 sand 通道对每个候选模型发一条极短请求，绿色=这个号真的能用（走 bot 额度，跟套餐无关）。</p>
+        <div id="probeBody"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 目标文件「改了哪几处」抽屉 -->
+  <div id="diffModal" class="modal-hide">
+    <div class="sheet sheet-wide">
+      <div class="shead">
+        <span class="diff-title"><span id="diffFile">—</span><span class="diff-sub" id="diffSub"></span></span>
+        <span class="diff-actions">
+          <button class="btn btn-ghost btn-xs" id="diffReveal">⧉ 在资源管理器中显示</button>
+          <button class="x" id="diffClose">×</button>
+        </span>
+      </div>
+      <div class="sbody diff-body">
+        <div class="diff-summary" id="diffSummary"></div>
+        <div class="diff-list" id="diffList"><div class="sess-empty">读取中…</div></div>
       </div>
     </div>
   </div>

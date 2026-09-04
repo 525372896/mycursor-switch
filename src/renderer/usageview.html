@@ -15,8 +15,13 @@
     .sp { flex: 1; }
     .rf { border: 1px solid #26324f; background: transparent; color: #8ea0c8; border-radius: 8px; padding: 6px 12px; cursor: pointer; font-size: 12px; }
     .rf:hover { border-color: #3b82f6; color: #e6ecff; }
-    #wvwrap { flex: 1; min-height: 0; display: flex; background: #fff; }
-    webview { flex: 1; width: 100%; height: 100%; border: 0; }
+    #wvwrap { flex: 1; min-height: 0; display: flex; background: #fff; position: relative; }
+    webview { flex: 1; width: 100%; height: 100%; border: 0; opacity: 0; transition: opacity .15s ease; }
+    /* 加载遮罩：切换/加载时盖住，等侧栏隐藏完成再露出内容，避免旧菜单一闪而过 */
+    #mask { position: absolute; inset: 0; z-index: 5; background: #fff; display: flex; align-items: center; justify-content: center; gap: 8px; color: #64748b; font-size: 13px; }
+    #mask.hide { display: none; }
+    #mask .sp2 { width: 22px; height: 22px; border: 3px solid #cbd5e1; border-top-color: #3b82f6; border-radius: 50%; animation: spin .8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
@@ -27,7 +32,7 @@
     <span class="sp"></span>
     <button class="rf" id="reload">刷新</button>
   </div>
-  <div id="wvwrap"></div>
+  <div id="wvwrap"><div id="mask"><span class="sp2"></span>加载中…</div></div>
   <script src="usageview.js"></script>
 </body>
 </html>

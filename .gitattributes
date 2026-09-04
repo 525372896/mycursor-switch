@@ -1,0 +1,17 @@
+# 默认按平台换行；下面这些必须固定为 LF，否则 macOS / CI 上跑不起来（bash 会把 \r 当成命令的一部分）
+* text=auto
+*.command text eol=lf
+*.sh      text eol=lf
+*.yml     text eol=lf
+*.yaml    text eol=lf
+
+# Windows 专用脚本固定 CRLF
+*.bat     text eol=crlf
+*.ps1     text eol=crlf
+
+# 二进制
+*.ico binary
+*.png binary
+*.icns binary
+*.dmg binary
+*.exe binary

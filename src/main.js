@@ -15,10 +15,10 @@ const RELEASES_URL = GITHUB_URL + '/releases/latest';
 
 function createWindow() {
   win = new BrowserWindow({
-    width: 880,
-    height: 660,
-    minWidth: 720,
-    minHeight: 520,
+    width: 1080,
+    height: 760,
+    minWidth: 920,
+    minHeight: 640,
     title: 'MyCursor 换号助手',
     backgroundColor: '#0f1729',
     icon: path.join(__dirname, 'icon.png'),
@@ -134,6 +134,37 @@ ipcMain.handle('accounts:add', async (_e, rawToken) => {
 
 ipcMain.handle('accounts:remove', (_e, id) => ({ ok: store.remove(id) }));
 
+// 模型探测：这个号在 sand 通道下实际能用哪些高级模型
+ipcMain.handle('accounts:probeSand', async (_e, id) => {
+  const rec = store.tokenById(id);
+  if (!rec) return { ok: false, msg: '账号不存在（可能已删除）' };
+  log(`🔬 正在探测 ${rec.email || '该账号'} 在 sand 下可用的模型（逐个真调用，约 10-40s）…`);
+  try {
+    const r = await cursor.probeSandModels(rec.token);
+    if (!r.ok) { log('⚠ 探测失败：' + (r.msg || '未知')); return r; }
+    log(`✅ ${rec.email || '该账号'} 可用 ${r.ok.length} 个模型：${r.ok.join('、') || '无'}`);
+    return r;
+  } catch (e) { log('❌ 探测失败：' + e.message); return { ok: false, msg: e.message }; }
+});
+
+// 领取 Sand 资格：让 free / 普通套餐号拿到 bot 额度（原理图「情况③」）
+ipcMain.handle('accounts:claimSand', async (_e, id) => {
+  const rec = store.tokenById(id);
+  if (!rec) return { ok: false, msg: '账号不存在（可能已删除）' };
+  log(`⏳ 正在给 ${rec.email || '该账号'} 领取 Sand 资格…`);
+  try {
+    const r = await cursor.claimSand(rec.token);
+    if (!r.ok) { log('⚠ 领取 Sand 资格：' + (r.msg || '失败')); return r; }
+    if (r.outcome === 'card_required') {
+      log('⚠ ' + (rec.email || '该账号') + '：免费号需先绑卡，已打开验证链接');
+      if (r.url) shell.openExternal(r.url).catch(() => { /* ignore */ });
+    } else {
+      log((r.granted ? '✅ ' : 'ℹ ') + (rec.email || '该账号') + '：' + r.msg);
+    }
+    return r;
+  } catch (e) { log('❌ 领取 Sand 资格失败：' + e.message); return { ok: false, msg: e.message }; }
+});
+
 // 轻量额度（列表行懒加载）：套餐 + 总/Auto/API/Grok 百分比
 ipcMain.handle('accounts:usage', async (_e, id) => {
   const rec = store.tokenById(id);
@@ -197,8 +228,9 @@ function friendlyPatchErr(e) {
   return m;
 }
 
-ipcMain.handle('patch:status', () => {
-  try { return patchEngine.patchStatus(); }
+// withProcesses=false 时 3ms 返回（文件级 + 布局缓存），界面轮询用；带进程数要跑一次 tasklist（~0.5s）
+ipcMain.handle('patch:status', (_e, opts) => {
+  try { return patchEngine.patchStatus(opts || {}); }
   catch (e) { return { ok: false, error: (e && e.message) || String(e) }; }
 });
 
@@ -207,23 +239,31 @@ ipcMain.handle('patch:setPath', (_e, p) => {
   catch (e) { return { ok: false, error: (e && e.message) || String(e) }; }
 });
 
+// 结构化事件（step / log / progress）转发给界面的「实时会话」面板；同时保留旧 patch-progress 通道
+function patchEventSink() {
+  return (ev) => { try { if (win) win.webContents.send('patch-event', ev); } catch (e) { /* ignore */ } };
+}
+const patchProgressSink = (percent, message) => { try { if (win) win.webContents.send('patch-progress', { percent, message }); } catch (e) { /* ignore */ } };
+
 ipcMain.handle('patch:apply', async () => {
   try {
-    log('⏳ 正在给本机 Cursor 打 Sand Stream 补丁（会自动关闭并重启 Cursor）…');
+    log('⏳ 正在给本机 Cursor 打 Sand 补丁（会自动关闭并重启 Cursor）…');
     const r = await patchEngine.applyPatch({
       preferStream: getStreamDirect(),   // 用户开关：Stream 直连 or 基础模式
-      onProgress: (percent, message) => { try { if (win) win.webContents.send('patch-progress', { percent, message }); } catch (e) { /* ignore */ } },
+      onEvent: patchEventSink(),
+      onProgress: patchProgressSink,
       // HTTP 兼容模式静默切到 HTTP/2（用户无感知，不在日志中提示）
       beforeStart: async () => { try { http2.setHttp2(true); } catch (e) { /* 静默处理 */ } },
     });
     const mode = r.streamMode
       ? 'Stream 模式已生效'
-      : '基础模式已生效（当前 Cursor 版本未匹配 Stream 直连，核心 sand 功能可用）';
-    log('✅ 补丁完成' + (r.noop ? '（已是最新，无需改动）' : '') + '。Cursor 已重启，' + mode + '。');
-    return { ok: true, streamMode: !!r.streamMode, basicMode: !!r.basicMode, noop: !!r.noop };
+      : '基础模式已生效' + (r.streamReason ? '（' + r.streamReason + '）' : '');
+    log('✅ 补丁完成' + (r.noop ? '（已是最新，无需改动）' : `（改写 ${(r.files || []).length} 个文件）`) + '。Cursor 已重启，' + mode + '。');
+    return { ok: true, streamMode: !!r.streamMode, basicMode: !!r.basicMode, noop: !!r.noop, files: r.files || [], streamReason: r.streamReason || '', elapsedMs: r.elapsedMs || 0 };
   } catch (e) {
     const msg = friendlyPatchErr(e);
     log('❌ 打补丁失败：' + msg);
+    try { if (win) win.webContents.send('patch-event', { type: 'error', text: msg }); } catch (e2) { /* ignore */ }
     return { ok: false, msg };
   }
 });
@@ -231,16 +271,35 @@ ipcMain.handle('patch:apply', async () => {
 ipcMain.handle('patch:restore', async () => {
   try {
     log('⏳ 正在回退本机 Cursor 补丁（会自动关闭并重启 Cursor）…');
-    const r = await patchEngine.restorePatch({
-      onProgress: (percent, message) => { try { if (win) win.webContents.send('patch-progress', { percent, message }); } catch (e) { /* ignore */ } },
-    });
-    log('✅ 已回退补丁' + (r.noop ? '（本机没有补丁，无需改动）' : '') + '。Cursor 已重启。');
-    return { ok: true, noop: !!r.noop };
+    const r = await patchEngine.restorePatch({ onEvent: patchEventSink(), onProgress: patchProgressSink });
+    log('✅ 已回退补丁' + (r.noop ? '（本机没有补丁，无需改动）' : `（还原 ${(r.files || []).length} 个文件）`) + '。Cursor 已重启。');
+    return { ok: true, noop: !!r.noop, files: r.files || [], elapsedMs: r.elapsedMs || 0 };
   } catch (e) {
     const msg = friendlyPatchErr(e);
     log('❌ 回退失败：' + msg);
+    try { if (win) win.webContents.send('patch-event', { type: 'error', text: msg }); } catch (e2) { /* ignore */ }
     return { ok: false, msg };
   }
+});
+
+ipcMain.handle('patch:openFolder', (_e, p) => {
+  try { if (p && fs.existsSync(p)) { shell.showItemInFolder(p); return { ok: true }; } } catch (e) { /* ignore */ }
+  return { ok: false };
+});
+
+// 上一次打补丁/卸载的完整会话（步骤/日志/逐文件），界面启动后回放，不再一直「待命」
+ipcMain.handle('patch:lastSession', () => {
+  try { return patchEngine.loadLastSession(); } catch (e) { return null; }
+});
+// 某个目标文件「改了哪几处」：按 marker 定位每处改动并带上下文
+ipcMain.handle('patch:fileChanges', (_e, rel) => {
+  try { return patchEngine.fileChanges(String(rel || '')); }
+  catch (e) { return { ok: false, error: (e && e.message) || String(e) }; }
+});
+// 在资源管理器 / Finder 里定位某个目标文件
+ipcMain.handle('patch:revealFile', (_e, rel) => {
+  try { const abs = patchEngine.resolveTargetAbs(String(rel || '')); shell.showItemInFolder(abs); return { ok: true, abs }; }
+  catch (e) { return { ok: false, error: (e && e.message) || String(e) }; }
 });
 
 // ---------- 偏好：禁止 Cursor 自动更新开关（默认开启）----------

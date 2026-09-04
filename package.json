@@ -1,6 +1,6 @@
 {
   "name": "mycursor-switch",
-  "version": "1.0.13",
+  "version": "1.0.14",
   "description": "MyCursor 换号助手 — 粘 token 加号 + 一键换号登录 Cursor（Windows / macOS）",
   "main": "src/main.js",
   "author": "MyCursor",
@@ -26,6 +26,7 @@
       "src/**/*",
       "!**/*.map"
     ],
+    "afterPack": "./build/afterPack.js",
     "publish": [
       { "provider": "github", "owner": "525372896", "repo": "mycursor-switch", "releaseType": "release" }
     ],

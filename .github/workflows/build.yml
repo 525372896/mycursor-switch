@@ -37,6 +37,14 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # macOS 未做 Apple 签名/公证，首次打开会被 Gatekeeper 拦；把一键修复脚本和说明一起挂到 Release，
+      # 让用户能从同一个发布页下载（README 里的 fix-macos.command 直链就指向这里）。
+      - name: Upload macOS helper files to Release (on tag)
+        if: startsWith(github.ref, 'refs/tags/') && runner.os == 'macOS'
+        run: gh release upload "${GITHUB_REF_NAME}" mac-help/fix-macos.command mac-help/README-macos.md --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Build only (manual)
         if: ${{ !startsWith(github.ref, 'refs/tags/') }}
         run: npx electron-builder --publish never

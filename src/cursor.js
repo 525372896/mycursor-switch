@@ -191,6 +191,102 @@ async function fetchUsageBrief(rawToken) {
   return out;
 }
 
+// ---------- 领取 Sand 资格（让 free / 普通套餐号能用 bot 额度）----------
+// 对齐 SandClaimer sand_api.py 的 claim 编排：已解锁/已授予→短路；团队号→团队通道；否则个人试用；免费号→需绑卡。
+// 全程用会话 cookie 打 cursor.com/api/dashboard/*（写操作带 Origin 过 CSRF）；返回结构给 UI 展示。
+
+// 从 token 里拿 user_id：优先 JWT sub，其次 token 里 :: 左边（ws token）
+function userIdOf(rawToken) {
+  const jwt = jwtOf(rawToken);
+  const sub = subFromJwt(jwt);
+  if (sub && ('user_' + '').length && String(sub).startsWith('user_')) return String(sub);
+  const left = subOf(rawToken);
+  if (left && String(left).startsWith('user_')) return String(left);
+  return String(sub || '').startsWith('user_') ? String(sub) : (left || '');
+}
+
+async function claimSand(rawToken) {
+  const token = normalizeToken(rawToken);
+  if (!token) return { ok: false, msg: 'token 为空' };
+  const jwt = jwtOf(token);
+  const userId = userIdOf(token);
+  if (!userId || !userId.startsWith('user_')) {
+    return { ok: false, outcome: 'no_userid', msg: 'token 里没有 user_ id（可能是纯网页票），无法领取资格' };
+  }
+  const cookie = 'WorkosCursorSessionToken=' + userId + '::' + jwt;
+  const H = { 'User-Agent': UA, 'Accept': 'application/json', 'Content-Type': 'application/json', 'Cookie': cookie, 'Origin': 'https://cursor.com', 'Referer': 'https://cursor.com/dashboard' };
+  const post = async (url, body) => {
+    const r = await fetch(url, { method: 'POST', headers: H, body: body || '{}' });
+    const text = await r.text().catch(() => '');
+    return { status: r.status, text };
+  };
+  try {
+    // 1) 已解锁？（GetSandUsageStatus 走 api2，Bearer accessToken）
+    try {
+      const u = await fetch('https://api2.cursor.sh/aiserver.v1.DashboardService/GetSandUsageStatus', {
+        method: 'POST', headers: { 'Authorization': 'Bearer ' + jwt, 'Content-Type': 'application/json', 'connect-protocol-version': '1' }, body: '{}',
+      });
+      if (u.ok) { const d = await u.json().catch(() => ({})); if (d.includedLimitZero !== true && d.hasNonZeroIncludedLimit === true) return { ok: true, outcome: 'already', granted: true, msg: '已开通 Sand 额度' }; }
+    } catch { /* 查不到就继续走领取 */ }
+    // 2) 已授予资格？
+    const acc = await post('https://cursor.com/api/dashboard/get-sand-access-status');
+    if (acc.status === 200) { let d = {}; try { d = JSON.parse(acc.text); } catch {} if (d.state === 'SAND_ACCESS_STATE_GRANTED') return { ok: true, outcome: 'already', granted: true, msg: '已授予 Sand 资格' }; }
+    // 3) 团队号？走团队通道
+    let teamId = null;
+    const me = await post('https://cursor.com/api/dashboard/get-me');
+    if (me.status === 200) { try { const d = JSON.parse(me.text); if (Number.isInteger(d.teamId) && d.teamId > 0) teamId = d.teamId; } catch {} }
+    if (teamId != null) {
+      const t = await post('https://cursor.com/api/dashboard/request-sand-team-access', JSON.stringify({ teamId }));
+      if (t.status !== 200) return { ok: false, outcome: 'failed', msg: `团队领取失败（HTTP ${t.status}）` };
+      try { await post('https://cursor.com/api/dashboard/update-team-sand-onboarding-completed', JSON.stringify({ teamId })); } catch { /* 幂等辅助 */ }
+      return { ok: true, outcome: 'team_ok', granted: true, teamId, msg: '团队 Sand 资格已请求/开通' };
+    }
+    // 4) 个人试用；免费号需绑卡
+    const tr = await post('https://cursor.com/api/dashboard/start-sand-trial');
+    if (tr.status !== 200) return { ok: false, outcome: 'failed', msg: `领取失败（HTTP ${tr.status}）：${tr.text.slice(0, 120)}` };
+    const low = tr.text.toLowerCase();
+    if (low.includes('cardverificationrequired') || low.includes('card_verification')) {
+      const m = /"(https:\/\/[^"]*(?:checkout|stripe)[^"]*)"/.exec(tr.text);
+      return { ok: true, outcome: 'card_required', granted: false, url: m ? m[1] : '', msg: '免费账号需先验证信用卡' };
+    }
+    return { ok: true, outcome: 'activated', granted: true, msg: '个人 Sand 资格已开通' };
+  } catch (e) {
+    return { ok: false, outcome: 'error', msg: '连不上 cursor.com：' + e.message };
+  }
+}
+
+// ---------- 模型探测：这个号在 sand 通道下实际能用哪些模型 ----------
+// web token 先换 session（沿用 exchangeSession），再用 sand_client.probeModels 逐个真调用。
+const SAND_PROBE_CANDIDATES = [
+  'grok-4.6', 'grok-4.5', 'composer-2.5',
+  'claude-fable-5', 'claude-opus-5', 'claude-opus-4-8', 'claude-opus-4-7',
+  'claude-sonnet-5', 'claude-sonnet-4-6',
+  'gpt-5', 'gpt-5-codex', 'o3', 'gemini-2.5-pro', 'gemini-2.5-flash',
+];
+
+async function probeSandModels(rawToken, models) {
+  const token = normalizeToken(rawToken);
+  if (!token) return { ok: false, msg: 'token 为空' };
+  // 拿一个 session accessToken：web 票走深链换取；已是 session 直接用
+  let access = jwtOf(token);
+  try {
+    const claims = JSON.parse(Buffer.from(access.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8'));
+    if (String(claims.type || '').toLowerCase() !== 'session') {
+      const pair = await exchangeSession(token, null);
+      if (pair && pair.access) access = pair.access;
+    }
+  } catch { /* 解析失败就按原样试 */ }
+  let sub = subFromJwt(access); if (!sub) sub = subOf(token);
+  const { probeModels } = require('./sand_client');
+  const { deviceIdentity, stableUuid } = require('./sand_checksum');
+  const identity = stableUuid('sand-gateway', sub || access);
+  const account = { accessToken: access, identity, device: deviceIdentity(identity, 'composer-api'), sessionId: crypto.randomUUID() };
+  try {
+    const r = await probeModels(account, Array.isArray(models) && models.length ? models : SAND_PROBE_CANDIDATES, { clientVersion: '0.18.0', timeoutMs: 45000, concurrency: 3 });
+    return { ok: true, ...r };
+  } catch (e) { return { ok: false, msg: e.message }; }
+}
+
 // ---------- 深链握手（换号时用）：登记本机登录并取回桌面 access/refresh/authId ----------
 
 async function exchangeSession(fullToken, log) {
@@ -426,6 +522,6 @@ async function switchAccount(fullToken, email, log) {
 function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
 module.exports = {
-  normalizeToken, validateToken, fetchUsage, fetchUsageBrief, exchangeSession, switchAccount,
-  stateDbPath, stateDbExists,
+  normalizeToken, validateToken, fetchUsage, fetchUsageBrief, claimSand, probeSandModels, exchangeSession, switchAccount,
+  stateDbPath, stateDbExists, SAND_PROBE_CANDIDATES,
 };
